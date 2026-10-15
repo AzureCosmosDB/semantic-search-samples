@@ -14,6 +14,12 @@ no alias or replacement authentication flow is needed.
 
 ## Requirements and layout
 
+Recommended for a clean clone: [root azd quickstart](../README.md#recommended-quickstart-azd-backend-local-python-and-net).
+It provisions the backend and generates `.local/azd-env.ps1`. Dot-source
+that script from the repository root before running this guide's loaders,
+apps or live tests. Do not replace generated endpoints with the manual
+placeholders below. The existing-resource route remains an alternative.
+
 - .NET 10 SDK. `global.json` allows the latest installed .NET 10 feature band.
 - Existing Cosmos DB for NoSQL account/database with vector/full-text support.
 - Existing compatible containers and a companion inference endpoint.

@@ -5,8 +5,9 @@
 - Keep language implementations independent: `dotnet/` and `python/`.
 - Shared public setup lives in `infra/`, `scripts/`, and root documentation.
 - Never change another agent's language subtree without explicit handoff.
-- Store actual endpoints, identities, logs, generated fixtures and receipts
-  under ignored `.local/` only. Never commit secrets or private package feeds.
+- Keep endpoints and identities only in ignored `.azure/`, generated `.env`,
+  or `.local/`; store logs, generated fixtures and receipts under `.local/`.
+  Never commit secrets or private package feeds.
 - Preserve MIT attribution. Synthetic fixtures must be original and bounded.
 
 ## Commands from the repository root
@@ -33,7 +34,15 @@ and not a method on `Microsoft.Azure.Cosmos.Container`.
   `reranker_dotnet_diskann`. Do not write Python fixtures/containers.
 - Azure setup requires an operator's explicit authorization. Scripts may
   create missing sample containers at 400 RU/s each, never change an existing
-  offer/policy or deploy the Cosmos account/database.
+  offer/policy. The existing-resource scripts never deploy a Cosmos account.
+- The separate authorized `azure.yaml` / `infra/azd/` path creates a new
+  dedicated group, GUID-named Cosmos/inference accounts, database and containers.
+  Read [the azd prerequisites](python/infra/azd/README.md) before running it.
+  Preserve the persisted letter-leading UUID. Never bypass preprovision:
+  inference creation is permitted only after an authenticated HTTP 404.
+  Use `azd provision`, then dot-source `. ./.local/azd-env.ps1` for both apps.
+  Do not run `azd down` during testing; report every created account, including
+  partial deployments. Do not add unrelated resources to the azd-owned group.
 - Companion creation and scoped role assignments are separate opt-in actions.
 - Never deploy paid App Service resources, commit, or push without approval.
 

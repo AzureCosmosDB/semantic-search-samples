@@ -13,3 +13,7 @@
 *.user
 *.zip
 infra/main.json
+**/.azure/
+**/.azd-config-*
+**/infra/azd/*.json
+!**/infra/azd/main.parameters.json

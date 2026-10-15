@@ -7,14 +7,124 @@ inference use distinct endpoints and permissions.
 | Implementation | Entry point | Setup |
 | --- | --- | --- |
 | .NET 10, ASP.NET Core Razor Pages | `dotnet/src/SemanticReranker.Web` | [Detailed .NET guide](dotnet/README.md) |
-| Python, Streamlit | `python/` | `python/README.md` after the separately verified migration is added |
+| Python, Streamlit | `python/` | [Standalone Python guide](python/README.md) |
 
 The .NET app offers vector search, full-text all/any matching, full-text
 ranking and hybrid RRF ranking. Each mode can rerank candidates. Results
 retain document IDs, titles and text, with retrieval rank, available vector
 distance, rerank score, timings and total Cosmos request charge.
 
-## Start with .NET
+## Recommended quickstart: azd backend, local Python and .NET
+
+Read the **[complete prerequisite table](python/infra/azd/README.md#all-prerequisites)**,
+including installed tools and already-authorized Azure access. Root setup needs
+Git, azd (implementation baseline 1.25.6), Azure CLI, PowerShell 7 on all OSes,
+Python 3.10+/venv/pip, .NET 10 SDK, public package/network access with trusted
+TLS, and subscription privileges for resource creation and role assignments.
+Both `azd auth login` and `az login` are needed. Docker and OpenAI are not
+required for the synthetic fixtures, full-text retrieval or reranking.
+
+Run from a clean clone's **repository root**, in PowerShell 7:
+
+```powershell
+python -m venv python/.venv
+$py = if ($IsWindows) { './python/.venv/Scripts/python.exe' } else { './python/.venv/bin/python' }
+& $py -m pip install -r python/requirements.txt -r python/requirements-dev.txt
+& $py -m pytest -q python/tests/unit python/tests/ui
+dotnet restore dotnet/SemanticReranker.sln
+dotnet build dotnet/SemanticReranker.sln --no-restore
+dotnet test dotnet/SemanticReranker.sln --no-build --filter 'Category!=Live'
+az bicep build --file infra/azd/main.bicep --stdout
+
+$tenant = Read-Host 'Tenant ID'
+$subscription = Read-Host 'Subscription ID'
+azd auth login --tenant-id $tenant
+az login --tenant $tenant
+az account set --subscription $subscription
+azd init --environment reranker-combined-dev
+azd env set AZURE_SUBSCRIPTION_ID $subscription
+azd env set AZURE_LOCATION uksouth
+azd env select reranker-combined-dev
+# Must print false before the FIRST provision. Choose another unused name otherwise.
+az group exists --name rg-reranker-reranker-combined-dev --subscription $subscription
+azd provision
+if ($LASTEXITCODE -ne 0) { throw 'Provisioning or configuration hook failed' }
+. ./.local/azd-env.ps1
+```
+
+On Linux/macOS create the venv with `python3` and run these commands in
+`pwsh`. Change the environment name consistently if it is already in use.
+Use different names for root and standalone `python/` deployments.
+
+The isolated `infra/azd/` path provisions a new dedicated resource group,
+same-name GUID Cosmos and inference accounts, database `reranker`, and four
+containers: `search_qflat`, `search_diskann`, `reranker_dotnet_qflat`,
+`reranker_dotnet_diskann`. Each has vector and full-text policies and
+dedicated manual **400 RU/s**, for **1600 RU/s total**, plus storage and
+inference charges until cleanup. Accounts are keyless; the signed-in azd
+user receives scoped Cosmos Data Contributor and Semantic Reranker User.
+The preprovision hook persists a canonical lowercase GUID starting **a-f**
+for both accounts. It adopts a valid existing account output when present,
+and reuses the persisted name on reprovision. Preserve ignored azd state.
+Failed provisioning can leave paid partial resources; see
+[naming preflight and explicit recovery](python/infra/azd/README.md#naming-preflight-and-failed-provisioning).
+No failed resources are automatically deleted or rolled back.
+
+There are **no hosted services**. `azd provision` is the recommended command;
+`azd up` has no cloud app deployment to perform. Previous existing accounts
+are not referenced or modified. The postprovision hook automatically
+configures `python/.env`, `python/.local/azd-env.ps1` and root
+`.local/azd-env.ps1`. It preserves unrelated Python `.env` settings.
+Dot-source root config for **both** apps; no endpoint copying is needed.
+.NET does not read `.env`. The hook cannot change the calling shell,
+and Python process variables take precedence over `.env`.
+
+Explicitly load the original synthetic fixtures using generated config:
+
+```powershell
+& $py python/scripts/make-fixtures.py
+& $py python/src/data/data-loader.py `
+  --path_to_json_array python/tests/fixtures/movies.synthetic.json `
+  --text_field_name text --vector_field_name embedding --re_embed False `
+  --existing-only --max-items 3 --confirm-write --concurrency 1
+if ($LASTEXITCODE -ne 0) { throw 'Python fixture loading failed' }
+pwsh scripts/New-SyntheticFixture.ps1
+dotnet run --no-build --project dotnet/tools/DataLoader -- `
+  --path .local/fixtures/movies.dotnet.preembedded.json `
+  --existing-only --max-items 3 --confirm-write
+if ($LASTEXITCODE -ne 0) { throw '.NET fixture loading failed' }
+# Repeat both loaders to check stable-ID upserts, without deleting anything.
+$env:RUN_LIVE_TESTS = '1'
+$env:ALLOW_FIXTURE_UPSERT = '1'
+& $py -m pytest -q python/tests/live
+dotnet test dotnet/SemanticReranker.sln --no-build --filter 'Category=Live'
+Remove-Item Env:RUN_LIVE_TESTS, Env:ALLOW_FIXTURE_UPSERT
+```
+
+Allow role and index propagation before live tests. Launch one app per
+terminal, dot-sourcing `. ./.local/azd-env.ps1` in **each** terminal first:
+
+```powershell
+# Terminal 1, repository root:
+$py = if ($IsWindows) { './python/.venv/Scripts/python.exe' } else { './python/.venv/bin/python' }
+& $py -m streamlit run python/src/app/cosmos-app.py --server.port 8501
+# Terminal 2, repository root:
+dotnet run --no-build --no-launch-profile `
+  --project dotnet/src/SemanticReranker.Web --urls http://127.0.0.1:8503
+```
+
+Open those URLs, select both indexes and try full-text retrieval/ranking
+with reranking off/on. Optional real embedding configuration is described
+in each language guide. [Real browser validation](dotnet/README.md#real-browser-validation)
+is an additional opt-in check, not implied by a health response.
+
+For switching, stop apps, `azd env select <name>`, `azd env refresh`,
+`pwsh scripts/postprovision.ps1`, dot-source again and restart apps.
+See [resource inventory, repeat provisioning and cleanup](infra/azd/README.md).
+Do not run `azd down` in tests: it destructively removes the selected
+environment's dedicated resource group and data. Leave resources for review.
+
+## Alternative: start with .NET against existing resources
 
 Prerequisites: .NET 10 SDK, Azure CLI, PowerShell 7 for setup scripts, an
 existing Cosmos account and database with vector/full-text support, and an
@@ -66,9 +176,9 @@ query execution, not semantic embedding quality.
 - [Agent commands and write boundaries](AGENTS.md)
 
 Tests with doubles are not live-service evidence. Live suites are opt-in and
-fail if enabled prerequisites are missing. There is no automatic deletion,
-rollback, container recreation, Cosmos account redeployment or App Service
-deployment.
+fail if enabled prerequisites are missing. There is no automatic data deletion or App Service deployment. The azd path
+owns only its new environment resources; the existing-resource scripts do
+not redeploy a Cosmos account/database or recreate containers.
 
 This is a small sample, not a public multi-user search gateway. Protect a
 deployed app with authentication and access restrictions before exposing a

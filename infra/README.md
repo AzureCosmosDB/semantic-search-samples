@@ -1,6 +1,11 @@
 # Explicit setup with existing Cosmos resources
 
-Nothing here deploys the Cosmos account or database, changes account
+For a new backend, use the recommended [azd path](azd/README.md).
+This document describes only the original existing-resource alternative:
+`infra/main.bicep` and `scripts/Initialize-*.ps1`. Those files do not use
+`infra/azd/` and their deployment semantics are unchanged.
+
+Nothing in this existing-resource procedure deploys the Cosmos account or database, changes account
 capabilities, enables local keys, or deletes data. Use an existing database
 in an account already configured for vector and full-text search. The data
 and management planes have separate permissions.
