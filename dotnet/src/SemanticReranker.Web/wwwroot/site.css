@@ -1,0 +1,16 @@
+body { font-family: system-ui, sans-serif; margin: 2rem; color: #202020; background: #fff; }
+main { max-width: 1500px; margin: auto; }
+.search-layout { display: grid; grid-template-columns: minmax(230px, 300px) minmax(0, 1fr); gap: 2rem; }
+label { display: block; margin-top: 1rem; font-weight: 600; }
+select, textarea, button { box-sizing: border-box; width: 100%; padding: .6rem; font: inherit; }
+button { margin-top: 1rem; cursor: pointer; }
+.checkbox { display: flex; align-items: center; gap: .5rem; }
+table { border-collapse: collapse; width: 100%; }
+td, th { border: 1px solid #ccc; padding: .6rem; text-align: left; vertical-align: top; }
+th { background: #f2f2f2; }
+.table-scroll { overflow-x: auto; }
+[role=alert] { border: 2px solid #a00000; padding: 1rem; color: #800000; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: .4rem 1rem; }
+dd { margin: 0; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 800px) { .search-layout { grid-template-columns: 1fr; } body { margin: 1rem; } }

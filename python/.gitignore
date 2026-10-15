@@ -1,0 +1,17 @@
+.env
+.diskann
+.DS_Store
+.azure
+.idea
+.deployment
+.vscode
+venv
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.local/
+*.log

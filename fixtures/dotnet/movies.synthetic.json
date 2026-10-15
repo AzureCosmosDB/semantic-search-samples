@@ -1,0 +1,20 @@
+[
+  {
+    "id": "synthetic-dotnet-ocean",
+    "title": "The Listening Vessel",
+    "text": "Marine scientists sail across the ocean to track whales. Their research vessel records whale songs and protects marine wildlife.",
+    "embeddingAxis": 0
+  },
+  {
+    "id": "synthetic-dotnet-garden",
+    "title": "A Garden for Tomorrow",
+    "text": "Neighbors restore a neglected garden. They plant vegetables, share seeds and teach children how to care for urban soil.",
+    "embeddingAxis": 1
+  },
+  {
+    "id": "synthetic-dotnet-stars",
+    "title": "The Quiet Observatory",
+    "text": "An astronomy student repairs a mountain telescope. The observatory team studies distant stars and photographs a comet.",
+    "embeddingAxis": 2
+  }
+]

@@ -1,0 +1,88 @@
+@page
+@model IndexModel
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cosmos DB semantic search</title>
+  <link rel="stylesheet" href="~/site.css" />
+</head>
+<body>
+<main>
+  <h1>Cosmos DB semantic search</h1>
+  <p>Retrieve candidates from Cosmos DB. Optionally rerank them with the separate Azure.Data.AI client.</p>
+  <div class="search-layout">
+    <aside>
+      <form method="post">
+        <label asp-for="Query">Query</label>
+        <textarea asp-for="Query" maxlength="1000" rows="4" required></textarea>
+        <label asp-for="Container">Container / vector index</label>
+        <select asp-for="Container">
+          <option value="qflat">Quantized flat + full text</option>
+          <option value="diskann">DiskANN + full text</option>
+        </select>
+        <label asp-for="Mode">Search mode</label>
+        <select asp-for="Mode">
+          <option value="Vector">Vector search</option>
+          <option value="FullText">Full-text search</option>
+          <option value="FullTextRank">Full-text ranking</option>
+          <option value="Hybrid">Hybrid RRF ranking</option>
+        </select>
+        <label asp-for="AllKeywords">Full-text matching</label>
+        <select asp-for="AllKeywords">
+          <option value="true">All keywords</option>
+          <option value="false">Any keyword</option>
+        </select>
+        <label class="checkbox"><input asp-for="Rerank" /> Semantic reranking</label>
+        <button type="submit">Search</button>
+      </form>
+      <p>Vector and hybrid modes require a configured embedding deployment. Full-text modes and reranking do not.</p>
+    </aside>
+    <section aria-label="Search results">
+      @if (Model.ErrorMessage is not null)
+      {
+        <div id="search-error" role="alert">@Model.ErrorMessage</div>
+      }
+      @if (Model.Result is { } result)
+      {
+        <h2 id="result-status">@(result.Reranked ? "Reranked results" : "Retrieval results")</h2>
+        <p id="result-count">@result.Rows.Count results</p>
+        <dl id="diagnostics">
+          <dt>Retrieval</dt><dd>@result.RetrievalMilliseconds.ToString("F1") ms</dd>
+          <dt>Embedding</dt><dd>@result.EmbeddingMilliseconds.ToString("F1") ms</dd>
+          <dt>Reranking</dt><dd>@result.RerankMilliseconds.ToString("F1") ms</dd>
+          <dt>Total</dt><dd>@result.TotalMilliseconds.ToString("F1") ms</dd>
+          <dt>Cosmos request charge (all pages)</dt><dd>@result.RequestCharge.ToString("F2") RU</dd>
+        </dl>
+        @if (result.Rows.Count == 0)
+        {
+          <p>No matching documents. Reranking was not invoked.</p>
+        }
+        else
+        {
+          <div class="table-scroll">
+          <table id="results">
+            <thead><tr><th>Rank</th><th>Retrieval rank</th><th>ID</th><th>Title</th><th>Text</th><th>Vector distance</th><th>Rerank score</th></tr></thead>
+            <tbody>
+            @for (var index = 0; index < result.Rows.Count; index++)
+            {
+              var row = result.Rows[index];
+              <tr>
+                <td>@(index + 1)</td><td>@row.RetrievalRank</td><td>@row.Id</td><td>@row.Title</td><td>@row.Text</td>
+                <td>@(row.RetrievalScore?.ToString("F5") ?? "n/a")</td>
+                <td class="rerank-score">@(row.RerankScore?.ToString("F5") ?? "n/a")</td>
+              </tr>
+            }
+            </tbody>
+          </table>
+          </div>
+        }
+        <p>Vector distance is lower-is-better. Rerank score is higher-is-better. Full-text and RRF scores are not projected by this query.</p>
+        <details><summary>Executed query (embedding parameter omitted)</summary><pre>@result.Sql</pre></details>
+      }
+    </section>
+  </div>
+</main>
+</body>
+</html>
