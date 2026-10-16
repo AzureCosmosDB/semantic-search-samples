@@ -1,7 +1,5 @@
 # Azure Cosmos DB semantic search samples
 
-Repository: [TheovanKraay/semantic-search-samples](https://github.com/TheovanKraay/semantic-search-samples).
-
 Search Azure Cosmos DB for NoSQL, then optionally rerank the retrieved
 documents with a **separate inference client**. Cosmos retrieval and
 inference use distinct endpoints and permissions.
