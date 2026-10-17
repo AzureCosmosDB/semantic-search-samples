@@ -36,15 +36,16 @@ public static class QueryBuilder
         // JSON string serialization, never raw interpolation, produces safe Cosmos SQL literals.
         var terms = request.Query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         var keywordLiterals = string.Join(", ", terms.Select(term => JsonSerializer.Serialize(term)));
-        var phraseLiteral = JsonSerializer.Serialize(request.Query.Trim());
+        // Match Python's ranked-query contract: one argument per search term,
+        // not the entire user input serialized as a single phrase argument.
         var projection = $"SELECT TOP {request.Limit} c.id, c.title, c.text";
         const string distance = "VectorDistance(c.embedding, @vector)";
         var sql = request.Mode switch
         {
             SearchMode.Vector => $"{projection}, {distance} AS retrievalScore FROM c ORDER BY {distance}",
             SearchMode.FullText => $"{projection} FROM c WHERE FullTextContains{(request.AllKeywords ? "All" : "Any")}(c.text, {keywordLiterals})",
-            SearchMode.FullTextRank => $"{projection} FROM c ORDER BY RANK FullTextScore(c.text, {phraseLiteral})",
-            SearchMode.Hybrid => $"{projection} FROM c ORDER BY RANK RRF(FullTextScore(c.text, {phraseLiteral}), {distance})",
+            SearchMode.FullTextRank => $"{projection} FROM c ORDER BY RANK FullTextScore(c.text, {keywordLiterals})",
+            SearchMode.Hybrid => $"{projection} FROM c ORDER BY RANK RRF(FullTextScore(c.text, {keywordLiterals}), {distance})",
             _ => throw new SampleException("Select a supported search mode.")
         };
         return new QueryPlan(sql, request.Mode is SearchMode.Vector or SearchMode.Hybrid ? vector : null);

@@ -24,7 +24,7 @@ public sealed record SampleSettings
         RerankerModel = Env("RERANKER_MODEL") ?? "aisearch-reranker",
         OpenAiEndpoint = Env("AZURE_OPENAI_ENDPOINT"),
         OpenAiDeployment = Env("AZURE_OPENAI_EMBEDDING_DEPLOYMENT"),
-        OpenAiKey = Env("AZURE_OPENAI_API_KEY"),
+        OpenAiKey = Env("AZURE_OPENAI_AUTH_MODE") == "entra" ? null : Env("AZURE_OPENAI_API_KEY"),
         OpenAiApiVersion = Env("AZURE_OPENAI_API_VERSION") ?? "2024-02-01",
         GatewayMode = Env("COSMOS_CONNECTION_MODE")?.Equals("Gateway", StringComparison.OrdinalIgnoreCase) == true
     };

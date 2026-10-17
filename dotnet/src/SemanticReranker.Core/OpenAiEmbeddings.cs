@@ -18,7 +18,7 @@ public sealed class OpenAiEmbeddings(SampleSettings settings, TokenCredential cr
             $"/openai/deployments/{Uri.EscapeDataString(settings.OpenAiDeployment)}/embeddings?api-version={Uri.EscapeDataString(settings.OpenAiApiVersion)}");
         using var request = new HttpRequestMessage(HttpMethod.Post, uri)
         {
-            Content = JsonContent.Create(new { input = text })
+            Content = JsonContent.Create(new { input = text, dimensions = 1536 })
         };
         if (!string.IsNullOrWhiteSpace(settings.OpenAiKey))
             request.Headers.Add("api-key", settings.OpenAiKey);

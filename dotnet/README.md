@@ -14,7 +14,11 @@ no alias or replacement authentication flow is needed.
 
 ## Requirements and layout
 
-Recommended for a clean clone: [root azd quickstart](../README.md#recommended-quickstart-azd-backend-local-python-and-net).
+Recommended for a clean clone: [root azd up quickstart](../README.md#deploy-and-start).
+It includes real embeddings and original movies. The root launcher starts both
+apps. Use `OriginalMovieLiveTests` and `python/scripts/verify_browser.py --include-dotnet`
+for the new real-embedding matrix. The older manual/synthetic validation below
+remains a separate integration and error-path workflow.
 It provisions the backend and generates `.local/azd-env.ps1`. Dot-source
 that script from the repository root before running this guide's loaders,
 apps or live tests. Do not replace generated endpoints with the manual
@@ -84,11 +88,11 @@ $env:AZURE_OPENAI_ENDPOINT = 'https://<openai-account>.openai.azure.com/'
 $env:AZURE_OPENAI_EMBEDDING_DEPLOYMENT = '<1536-dimensional-deployment>'
 ```
 
-The REST adapter requests one embedding and validates exactly 1536 finite
-float values. Use a deployment whose default output has that dimension,
-such as an appropriately configured compatible embedding deployment.
+The REST adapter explicitly requests 1536 dimensions and validates exactly
+1536 finite float values. Use a compatible text-embedding-3 deployment.
 Prefer Entra authentication with an OpenAI data role. An optional
-`AZURE_OPENAI_API_KEY` overrides authentication for OpenAI only. API version
+`AZURE_OPENAI_API_KEY` is used only outside generated `AZURE_OPENAI_AUTH_MODE=entra`
+configuration. The default azd path remains keyless. API version
 defaults to `2024-02-01`, configurable with `AZURE_OPENAI_API_VERSION`.
 No OpenAI client/request is created for full-text retrieval, reranking or
 preembedded loading. Missing embedding configuration is a visible UI error,
@@ -201,7 +205,8 @@ Configure the dedicated .NET containers, run the loader twice, then:
 
 ```powershell
 $env:RUN_LIVE_TESTS = '1'
-dotnet test dotnet/SemanticReranker.sln --no-build --filter 'Category=Live'
+dotnet test dotnet/SemanticReranker.sln --no-build `
+  --filter 'Category=Live&FullyQualifiedName~SemanticReranker.Tests.LiveTests.'
 ```
 
 Without the opt-in flag, live tests are reported as skipped. With it, missing
@@ -332,8 +337,9 @@ deployment. Health alone is insufficient.
   `InferenceClient.SemanticRerankAsync(SemanticRerankingInferenceContent, ...)`,
   `Scores`, nullable `Index` and nullable float `Score`; validate mapping when
   upgrading. No legacy Cosmos semantic-rerank APIs are used.
-- **No OpenAI:** full-text and reranking still work; vector/hybrid UI success
-  remains untested until a real compatible deployment is configured.
+- **Missing OpenAI settings on the manual path:** full-text and reranking still
+  work, but vector/hybrid requests fail explicitly. The default azd path supplies
+  the deployed embedding settings automatically.
 - **Large workloads:** this bounded sample is not a bulk loader or benchmark.
   Add production observability, authorization, quotas and resilient UX before
   broader deployment.

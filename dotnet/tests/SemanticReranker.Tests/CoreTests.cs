@@ -95,6 +95,31 @@ public class CoreTests
         Assert.Throws<SampleException>(() => QueryBuilder.Build(new("ok", "qflat", SearchMode.Vector), [1]));
     }
 
+    [Theory]
+    [InlineData(SearchMode.FullTextRank, "SPECTRE spy")]
+    [InlineData(SearchMode.Hybrid, "SPECTRE spy")]
+    [InlineData(SearchMode.FullTextRank, "  SPECTRE\tspy\n")]
+    [InlineData(SearchMode.Hybrid, "  SPECTRE\tspy\n")]
+    public void RankedModesScoreSeparateKeywordsLikePython(SearchMode mode, string query)
+    {
+        var plan = QueryBuilder.Build(new(query, "qflat", mode),
+            mode == SearchMode.Hybrid ? TestData.Vector(0) : null);
+        Assert.Contains("FullTextScore(c.text, \"SPECTRE\", \"spy\")", plan.Sql);
+        Assert.DoesNotContain("FullTextScore(c.text, \"SPECTRE spy\")", plan.Sql);
+    }
+
+    [Theory]
+    [InlineData(SearchMode.FullTextRank)]
+    [InlineData(SearchMode.Hybrid)]
+    public void RankedKeywordLiteralsRemainJsonEscaped(SearchMode mode)
+    {
+        var terms = new[] { "SPECTRE", "\"spy\"", "\\signal" };
+        var plan = QueryBuilder.Build(new(string.Join(" ", terms), "qflat", mode),
+            mode == SearchMode.Hybrid ? TestData.Vector(0) : null);
+        var expected = $"FullTextScore(c.text, {string.Join(", ", terms.Select(term => JsonSerializer.Serialize(term)))})";
+        Assert.Contains(expected, plan.Sql);
+    }
+
     [Fact]
     public async Task TextDoesNotUseEmbeddingsOrDisabledReranker()
     {

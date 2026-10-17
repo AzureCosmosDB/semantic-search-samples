@@ -24,6 +24,7 @@ public sealed class EmbeddingTests
         Assert.Equal("Bearer", handler.AuthenticationScheme);
         Assert.Equal("https://cognitiveservices.azure.com/.default", credential.Scope);
         Assert.Equal("ocean", handler.Input);
+        Assert.Equal(1536, handler.Dimensions);
     }
 
     [Fact]
@@ -70,11 +71,13 @@ public sealed class EmbeddingTests
     {
         public string? AuthenticationScheme { get; private set; }
         public string? Input { get; private set; }
+        public int Dimensions { get; private set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             AuthenticationScheme = request.Headers.Authorization?.Scheme;
             using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
             Input = body.RootElement.GetProperty("input").GetString();
+            Dimensions = body.RootElement.GetProperty("dimensions").GetInt32();
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(JsonSerializer.Serialize(new { data = new[] { new { index = 0, embedding = vector } } }),

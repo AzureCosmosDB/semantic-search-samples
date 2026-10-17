@@ -2,10 +2,11 @@
 [CmdletBinding()]
 param(
   [switch]$Prepare,
+  [switch]$BootstrapOnly,
   [switch]$RegenerateInvalidName
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = Split-Path -Parent $PSScriptRoot
 & (Join-Path $root 'python/scripts/postprovision.ps1') -ProjectRoot $root -IncludeDotnet `
-  -Prepare:$Prepare -RegenerateInvalidName:$RegenerateInvalidName
+  -Prepare:$Prepare -BootstrapOnly:$BootstrapOnly -RegenerateInvalidName:$RegenerateInvalidName
