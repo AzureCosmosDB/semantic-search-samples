@@ -7,6 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Cosmos DB semantic search</title>
   <link rel="stylesheet" href="~/site.css" />
+  <script src="~/advanced-reranking.js" defer></script>
 </head>
 <body>
 <main>
@@ -35,6 +36,28 @@
           <option value="false">Any keyword</option>
         </select>
         <label class="checkbox"><input asp-for="Rerank" /> Semantic reranking</label>
+        <details id="advanced-reranking">
+          <summary>Advanced reranking</summary>
+          <fieldset id="rerank-options" disabled="@(!Model.Rerank)">
+            <legend>Reranker options</legend>
+            <label asp-for="DocumentFormat">Document format</label>
+            <select asp-for="DocumentFormat">
+              <option value="text">text</option>
+              <option value="json">json</option>
+            </select>
+            <label asp-for="TargetPaths">JSON fields</label>
+            <select asp-for="TargetPaths" disabled="@(Model.DocumentFormat != "json")">
+              <option value="title,text">Title and Description</option>
+              <option value="title">Title only</option>
+              <option value="text">Description only</option>
+            </select>
+            <p>Description maps to the text field. Only selected JSON fields are sent.</p>
+            <label asp-for="RerankTopK">Rerank result limit</label>
+            <input asp-for="RerankTopK" type="number" min="1" max="10" step="1" required />
+            <label class="checkbox"><input asp-for="ReturnSentenceScores" /> Sentence-score diagnostics</label>
+            <p>Service sentence indices are not mapped to source text or JSON fields.</p>
+          </fieldset>
+        </details>
         <button type="submit">Search</button>
       </form>
       <p>Vector and hybrid modes require a configured embedding deployment. Full-text modes and reranking do not.</p>
@@ -48,6 +71,7 @@
       {
         <h2 id="result-status">@(result.Reranked ? "Reranked results" : "Retrieval results")</h2>
         <p id="result-count">@result.Rows.Count results</p>
+        <p id="candidate-count">Retrieved candidates: @result.RetrievedCount; returned results: @result.Rows.Count</p>
         <dl id="diagnostics">
           <dt>Retrieval</dt><dd>@result.RetrievalMilliseconds.ToString("F1") ms</dd>
           <dt>Embedding</dt><dd>@result.EmbeddingMilliseconds.ToString("F1") ms</dd>
@@ -77,6 +101,27 @@
             </tbody>
           </table>
           </div>
+          @if (result.SentenceScoresRequested)
+          {
+            for (var index = 0; index < result.Rows.Count; index++)
+            {
+              var row = result.Rows[index];
+              <details class="sentence-scores">
+                <summary>Sentence scores: result @(index + 1) (@row.Id)</summary>
+                @if (row.SentenceScores is { Count: > 0 } sentences)
+                {
+                  foreach (var sentence in sentences)
+                  {
+                    <p>Service sentence index: @sentence.Index; score: @sentence.Score</p>
+                  }
+                }
+                else
+                {
+                  <p>Sentence scores: not returned.</p>
+                }
+              </details>
+            }
+          }
         }
         <p>Vector distance is lower-is-better. Rerank score is higher-is-better. Full-text and RRF scores are not projected by this query.</p>
         <details><summary>Executed query (embedding parameter omitted)</summary><pre>@result.Sql</pre></details>

@@ -4,6 +4,8 @@ This is a small ASP.NET Core Razor Pages equivalent of the original
 Streamlit search workflow. It uses `Microsoft.Azure.Cosmos` for retrieval and
 the separately pinned `Azure.Data.AI` `1.0.0-beta.1` for reranking.
 It does not call a reranking method on the Cosmos client.
+See the [search guide](SEARCH_GUIDE.md) for manual startup, feature walkthroughs,
+and the collapsed advanced JSON targeting, result limit and sentence diagnostics.
 
 `Azure.Data.AI` requires `Azure.Core` `1.63.0`, which is also pinned directly.
 That Core package includes the credential classes in the `Azure.Identity`

@@ -173,6 +173,7 @@ internal sealed class FailingEmbedding : IEmbeddingProvider
 }
 internal sealed class FailingReranker : IReranker
 {
-    public Task<IReadOnlyList<RerankScore>> RerankAsync(string query, IReadOnlyList<SearchRow> rows, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<RerankScore>> RerankAsync(string query, IReadOnlyList<SearchRow> rows,
+        CancellationToken cancellationToken, RerankOptions? options = null) =>
         throw new InvalidOperationException("private endpoint and service details");
 }

@@ -18,6 +18,12 @@ public static class QueryBuilder
             throw new SampleException("Select a supported search mode.");
         if (request.Limit is < 1 or > 50)
             throw new SampleException("Result limit must be between 1 and 50.");
+        if (request.Rerank)
+        {
+            if (request.Limit > 10)
+                throw new SampleException("Reranking accepts at most 10 retrieved candidates.");
+            (request.RerankOptions ?? new RerankOptions()).Validate();
+        }
     }
 
     public static void ValidateVector(float[]? vector)

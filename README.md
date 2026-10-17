@@ -52,7 +52,10 @@ Use `-PythonPort` and `-DotnetPort` to select other ports. Startup never seeds d
 
 Try **SPECTRE spy**, **undercover agent satellite codes**, or **astronaut rescue**.
 For both indexes, try vector, full-text all/any, full-text ranking and hybrid,
-with reranking off and on. The UI layout is unchanged.
+with reranking off and on. Optional JSON targeting, result limits and sentence
+diagnostics are in the collapsed **Advanced reranking** section.
+For manual startup and code walkthroughs, see the
+[Python search guide](python/SEARCH_GUIDE.md) or [.NET search guide](dotnet/SEARCH_GUIDE.md).
 
 ## What azd up does
 
@@ -147,3 +150,5 @@ This visits both already-running apps, exercises the full mode/toggle matrix,
 prints each successful case and saves screenshots only under
 `python/.local/validation/original-movies/`. It neither starts nor stops apps.
 Browser tooling is optional and is not installed during `azd up`.
+Add `--matrix advanced` for an advanced-only rerun, or `--matrix baseline`
+for only the original cases. The default runs both.

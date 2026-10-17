@@ -42,6 +42,65 @@ public sealed class WebTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MissingAdvancedFieldsKeepDefaultsIncludingDisabledJsonTargets(bool postVisibleDefaults)
+    {
+        using var app = new TestWebApp();
+        using var client = app.CreateClient();
+        // Old clients omit all advanced fields. A browser using plain-text defaults
+        // omits the disabled TargetPaths select. Both must reach the same request.
+        Dictionary<string, string>? fields = postVisibleDefaults ? new()
+        {
+            ["DocumentFormat"] = "text",
+            ["RerankTopK"] = "10",
+            ["ReturnSentenceScores"] = "false"
+        } : null;
+        var html = await Post(client, SearchMode.FullText, true, fields);
+        Assert.DoesNotContain("id=\"search-error\"", html);
+        Assert.Contains("Reranked results", html);
+        Assert.Contains("Retrieved candidates: 2; returned results: 2", html);
+        Assert.Equal(new RerankOptions(), app.LastRerankOptions);
+        Assert.DoesNotContain("class=\"sentence-scores\"", html);
+    }
+
+    [Theory]
+    [InlineData("DocumentFormat")]
+    [InlineData("TargetPaths")]
+    [InlineData("RerankTopK")]
+    [InlineData("ReturnSentenceScores")]
+    public async Task ExplicitEmptyAdvancedFieldIsNotTreatedAsOmitted(string field)
+    {
+        using var app = new TestWebApp();
+        using var client = app.CreateClient();
+        var html = await Post(client, SearchMode.FullText, true, new()
+        {
+            ["DocumentFormat"] = "json",
+            [field] = ""
+        });
+        Assert.Contains("id=\"search-error\"", html);
+        Assert.DoesNotContain("id=\"results\"", html);
+        Assert.Null(app.LastRerankOptions);
+    }
+
+    [Fact]
+    public async Task InvalidCheckboxBindingRendersActionableErrorWithoutCallingReranker()
+    {
+        using var app = new TestWebApp();
+        using var client = app.CreateClient();
+        var html = await Post(client, SearchMode.FullText, true, new()
+        {
+            ["DocumentFormat"] = "json",
+            ["ReturnSentenceScores"] = "not-a-bool"
+        });
+        Assert.Contains("Sentence-score diagnostics must be true or false", html);
+        Assert.Contains("role=\"alert\"", html);
+        Assert.DoesNotContain("id=\"results\"", html);
+        Assert.DoesNotContain("not-a-bool", html);
+        Assert.Null(app.LastRerankOptions);
+    }
+
+    [Theory]
     [InlineData(SearchMode.Vector)]
     [InlineData(SearchMode.Hybrid)]
     public async Task MissingOpenAiIsVisibleAndDoesNotPretendSuccess(SearchMode mode)
@@ -63,6 +122,9 @@ public sealed class WebTests
         var html = await client.GetStringAsync("/");
         Assert.Contains("Cosmos DB semantic search", html);
         Assert.DoesNotContain("id=\"search-error\"", html);
+        Assert.Contains("<details id=\"advanced-reranking\">", html);
+        Assert.Matches("<fieldset(?=[^>]*id=\"rerank-options\")(?=[^>]*disabled)[^>]*>", html);
+        Assert.Matches("<input(?=[^>]*id=\"RerankTopK\")(?=[^>]*value=\"10\")[^>]*>", html);
     }
 
     [Fact]
@@ -75,12 +137,53 @@ public sealed class WebTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private static async Task<string> Post(HttpClient client, SearchMode mode, bool rerank)
+    [Theory]
+    [InlineData("text", "title,text", false)]
+    [InlineData("json", "title", true)]
+    [InlineData("json", "text", false)]
+    [InlineData("json", "title,text", true)]
+    public async Task AdvancedOptionsRenderSubsetAndOptionalDetails(string format, string paths, bool diagnostics)
+    {
+        using var app = new TestWebApp();
+        using var client = app.CreateClient();
+        var html = await Post(client, SearchMode.FullText, true, new()
+        {
+            ["DocumentFormat"] = format, ["TargetPaths"] = paths,
+            ["RerankTopK"] = "1", ["ReturnSentenceScores"] = diagnostics.ToString()
+        });
+        Assert.DoesNotContain("id=\"search-error\"", html);
+        Assert.Contains("Retrieved candidates: 2; returned results: 1", html);
+        Assert.Equal(diagnostics, html.Contains("class=\"sentence-scores\""));
+        Assert.Equal(diagnostics, html.Contains("Service sentence index: 7; score:"));
+    }
+
+    [Theory]
+    [InlineData("RerankTopK", "0")]
+    [InlineData("RerankTopK", "11")]
+    [InlineData("RerankTopK", "1.5")]
+    [InlineData("DocumentFormat", "xml")]
+    [InlineData("TargetPaths", "embedding")]
+    [InlineData("ReturnSentenceScores", "not-a-bool")]
+    public async Task CraftedAdvancedPostValidatesOnServerAndOffIgnores(string field, string value)
+    {
+        using var app = new TestWebApp();
+        using var client = app.CreateClient();
+        var options = new Dictionary<string, string> { ["DocumentFormat"] = "json", [field] = value };
+        var enabled = await Post(client, SearchMode.FullText, true, options);
+        Assert.Contains("id=\"search-error\"", enabled);
+        Assert.DoesNotContain("id=\"results\"", enabled);
+        var disabled = await Post(client, SearchMode.FullText, false, options);
+        Assert.DoesNotContain("id=\"search-error\"", disabled);
+        Assert.Contains("Retrieved candidates: 2; returned results: 2", disabled);
+    }
+
+    private static async Task<string> Post(HttpClient client, SearchMode mode, bool rerank,
+        Dictionary<string, string>? advanced = null)
     {
         var page = await client.GetStringAsync("/");
         var match = Regex.Match(page, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
         Assert.True(match.Success, "Razor must emit an antiforgery token.");
-        using var response = await client.PostAsync("/", new FormUrlEncodedContent(new Dictionary<string, string>
+        var fields = new Dictionary<string, string>
         {
             ["__RequestVerificationToken"] = WebUtility.HtmlDecode(match.Groups[1].Value),
             ["Query"] = "ocean",
@@ -88,7 +191,10 @@ public sealed class WebTests
             ["Mode"] = mode.ToString(),
             ["AllKeywords"] = "true",
             ["Rerank"] = rerank.ToString()
-        }));
+        };
+        if (advanced is not null)
+            foreach (var pair in advanced) fields[pair.Key] = pair.Value;
+        using var response = await client.PostAsync("/", new FormUrlEncodedContent(fields));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -96,6 +202,8 @@ public sealed class WebTests
 
 internal sealed class TestWebApp(bool failReranker = false) : WebApplicationFactory<Program>
 {
+    public RerankOptions? LastRerankOptions { get; private set; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -109,18 +217,25 @@ internal sealed class TestWebApp(bool failReranker = false) : WebApplicationFact
             services.AddSingleton(new SampleSettings());
             services.RemoveAll<IQueryExecutor>();
             services.AddSingleton<IQueryExecutor>(new FakeQuery(
-                [new("synthetic-dotnet-ocean", "The Listening Vessel", "<script>ocean</script>")]));
+                [new("synthetic-dotnet-ocean", "The Listening Vessel", "<script>ocean</script>"),
+                 new("synthetic-dotnet-other", "Other", "<script>ocean</script>")]));
             services.RemoveAll<IEmbeddingProvider>();
             services.AddSingleton<IEmbeddingProvider, FailingEmbedding>();
             services.RemoveAll<IReranker>();
-            services.AddSingleton<IReranker>(failReranker ? new FailingReranker() : new TestReranker());
+            services.AddSingleton<IReranker>(failReranker ? new FailingReranker()
+                : new TestReranker(options => LastRerankOptions = options));
         });
     }
 
-    private sealed class TestReranker : IReranker
+    private sealed class TestReranker(Action<RerankOptions?> capture) : IReranker
     {
         public Task<IReadOnlyList<RerankScore>> RerankAsync(string query, IReadOnlyList<SearchRow> rows,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<RerankScore>>([new(0, 0.9)]);
+            CancellationToken cancellationToken, RerankOptions? options = null)
+        {
+            capture(options);
+            return Task.FromResult<IReadOnlyList<RerankScore>>(Enumerable.Range(0, Math.Min(options?.TopK ?? 10, rows.Count))
+                .Select(i => new RerankScore(i, 0.9 - i / 10.0,
+                    options?.ReturnSentenceScores == true ? [new(7, 0.75)] : null)).ToArray());
+        }
     }
 }

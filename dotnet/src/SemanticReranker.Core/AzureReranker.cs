@@ -1,5 +1,6 @@
 using Azure.Core;
 using Azure.Data.AI;
+using System.Text.Json;
 
 namespace SemanticReranker.Core;
 
@@ -18,24 +19,50 @@ public sealed class AzureReranker : IReranker
     }
 
     public static SemanticRerankingInferenceContent CreateRequest(
-        string query, IReadOnlyList<SearchRow> rows, string model) =>
-        new(query, rows.Select(row => row.Text))
+        string query, IReadOnlyList<SearchRow> rows, string model, RerankOptions? options = null)
+    {
+        options ??= new();
+        options.Validate();
+        if (rows.Count > 10)
+            throw new SampleException("Reranking accepts at most 10 retrieved candidates.");
+        string[] paths = options.DocumentFormat == "json" ? options.TargetPaths.Split(',') : ["text"];
+        if (rows.Any(row => paths.Any(path =>
+                string.IsNullOrWhiteSpace(path == "title" ? row.Title : row.Text))))
+            throw new SampleException("Reranking requires nonempty selected fields on every retrieved document.");
+        // Whitelist projection, never serialize a whole Cosmos document or SearchRow.
+        var documents = rows.Select(row => options.DocumentFormat == "json"
+            ? JsonSerializer.Serialize(paths.ToDictionary(path => path,
+                path => path == "title" ? row.Title : row.Text))
+            : row.Text);
+        var content = new SemanticRerankingInferenceContent(query, documents)
         {
-            DocumentType = SemanticRerankingDocumentType.Text,
+            DocumentType = options.DocumentFormat == "json"
+                ? SemanticRerankingDocumentType.Json : SemanticRerankingDocumentType.Text,
             ReturnDocuments = false,
-            TopK = rows.Count,
+            TopK = Math.Min(options.TopK, rows.Count),
             Sort = true,
             Model = model
         };
+        if (options.DocumentFormat == "json") content.TargetPaths = options.TargetPaths;
+        if (options.ReturnSentenceScores) content.ReturnSentenceScore = true;
+        return content;
+    }
 
-    public static IReadOnlyList<RerankScore> MapResponse(SemanticRerankingInferenceResult result) =>
-        result.Scores.Select(score => new RerankScore(score.Index, score.Score)).ToArray();
+    public static IReadOnlyList<RerankScore> MapResponse(
+        SemanticRerankingInferenceResult result, bool returnSentenceScores = false) =>
+        result.Scores.Select(score => new RerankScore(score.Index, score.Score,
+            returnSentenceScores ? score.SentenceScores?.Select(sentence =>
+                new SentenceScore(sentence.Index, sentence.Score)).ToArray() : null)).ToArray();
 
     public async Task<IReadOnlyList<RerankScore>> RerankAsync(
-        string query, IReadOnlyList<SearchRow> rows, CancellationToken cancellationToken)
+        string query, IReadOnlyList<SearchRow> rows, CancellationToken cancellationToken,
+        RerankOptions? options = null)
     {
+        options ??= new();
+        options.Validate();
         if (rows.Count == 0) return [];
-        var response = await client.Value.SemanticRerankAsync(CreateRequest(query, rows, model), cancellationToken);
-        return MapResponse(response.Value);
+        var response = await client.Value.SemanticRerankAsync(
+            CreateRequest(query, rows, model, options), cancellationToken);
+        return MapResponse(response.Value, options.ReturnSentenceScores);
     }
 }
