@@ -57,6 +57,35 @@ diagnostics are in the collapsed **Advanced reranking** section.
 For manual startup and code walkthroughs, see the
 [Python search guide](python/SEARCH_GUIDE.md) or [.NET search guide](dotnet/SEARCH_GUIDE.md).
 
+## Advanced reranking controls
+
+In either app, enable **Semantic Reranker**, expand **Advanced reranking**,
+choose the options below, then run a search. When reranking is off, these
+controls are disabled and their saved values have no effect.
+
+| Control | What selecting it does |
+| --- | --- |
+| **Document format: text** (default) | Sends each candidate's description as plain text for reranking. The title is not included, and JSON field selection has no effect. |
+| **Document format: json** | Sends each candidate as a JSON object containing only the selected fields, so the reranker can use the title, description, or both. |
+| **JSON fields** (JSON mode only) | **Title** targets `title`; **Description** targets `text`; **Title and Description** (default) targets both. Unselected fields, embeddings, IDs and Cosmos system properties are not sent to the reranker. |
+| **Rerank result limit** (default **10**, range **1-10**) | Sets reranker `topK`: how many of the retrieved candidates to return, ordered by reranking score. It does not change the Cosmos query's candidate limit, which remains 10. If only two candidates were retrieved, a limit of five still returns only two. |
+| **Sentence-score diagnostics** (default **off**) | Requests optional sentence-level scores. Expand the sentence-score details for a returned result to see the service's sentence indices and scores. If the service provides none, the app displays **not returned**. |
+
+These options affect reranking only, not which documents Cosmos retrieves or
+how query embeddings are generated. A smaller result limit does not reduce the
+number of candidates sent for scoring. Sentence indices are service-defined;
+the apps do not map them to JSON fields or highlight matching source sentences.
+
+**Try it:** search for **SPECTRE spy**, select **json**, choose **Title and
+Description**, set the result limit to **3**, and enable sentence-score
+diagnostics. Run the search, then compare with **Title** alone. The selected
+fields can change relevance scores and ordering, but a different order is not
+guaranteed. No app restart or redeployment is needed.
+
+For request payloads, validation and result mapping, see the
+[Python advanced-reranking walkthrough](python/SEARCH_GUIDE.md#advanced-json-targeting-top-k-and-diagnostics)
+or [.NET advanced-reranking walkthrough](dotnet/SEARCH_GUIDE.md#advanced-reranking).
+
 ## What azd up does
 
 1. `preup` bootstraps dependencies and persists/reuses the account GUID.
