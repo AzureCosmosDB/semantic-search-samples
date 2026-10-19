@@ -77,6 +77,50 @@ After correcting configuration or switching identity/environment, stop the owned
 process, reload generated settings in a clean shell, and restart. Follow the root
 README for azd environment switching. Never log tokens or commit local config.
 
+## Using the search UI
+
+The light sidebar follows the Streamlit control order: **Index**, single-line
+**Search input**, **Use Semantic Reranker**, collapsed **Advanced reranking**,
+then the separate search buttons. There is no mode dropdown or generic Search
+button. Enter keywords such as `SPECTRE spy`, then choose:
+
+| Button label | Submitted `Mode` | Retrieval behavior |
+| --- | --- | --- |
+| Similarity search | `Vector` | Vector similarity |
+| Full text ranking | `FullTextRank` | FullTextScore ranking |
+| Hybrid search | `Hybrid` | Reciprocal rank fusion |
+| Full text search | `FullText` | Boolean keyword matching |
+
+**Search type** appears immediately before **Full text search**. Its native
+**all keywords** (`AllKeywords=true`) and **any keywords** (`AllKeywords=false`)
+radio buttons affect only that search, not the ranking modes.
+
+Each search button submits its own `name="Mode"` and value through the native
+HTML form. There is no hidden Mode input. Missing, duplicate, numeric, or
+unsupported mode values are rejected before search services run. Antiforgery is
+unchanged. Pressing Enter in Search input uses the browser's first submit button,
+**Similarity search**. To choose a different search with the keyboard, Tab to its
+button and press Enter or Space.
+
+JavaScript only enhances the advanced controls: it disables them when reranking
+is off and disables JSON fields for text format. It retains those choices in the
+submitted form even while disabled. Without JavaScript the controls stay usable;
+the server still ignores advanced options when reranking is off. Valid form
+choices survive success and errors. Invalid typed values can fall back to safe
+defaults with a visible error. Advanced reranking opens on errors while reranking
+is enabled so its options can be corrected.
+
+The main area shows the selected search and input, result and candidate counts,
+all existing timings and RU, and the results table. IDs appear below titles and
+original retrieval ranks below display ranks; neither is removed. Vector
+distances and rerank scores remain separate columns. **Executed query** is an
+optional disclosure, as are requested per-result sentence scores.
+
+The sidebar stacks above the main area on small screens. Only the table scrolls
+horizontally; its focusable region supports keyboard scrolling. Native labels,
+details, radio groups, visible focus outlines, and **Skip to results** support
+keyboard navigation without injected UI or forced clicks.
+
 ## Request and data flow
 
 [`IndexModel.OnPostAsync`](src/SemanticReranker.Web/Pages/Index.cshtml.cs) binds
@@ -157,7 +201,7 @@ higher-is-better and does not overwrite RetrievalScore.
 ### Advanced reranking
 
 The native **Advanced reranking** details element starts collapsed.
-Enable Semantic reranking to use its controls:
+Enable **Use Semantic Reranker** to use its controls:
 
 | Control | Default | Native request behavior |
 | --- | --- | --- |
@@ -235,7 +279,8 @@ Remove-Item Env:RUN_LIVE_TESTS
 [`AdvancedRerankingTests`](tests/SemanticReranker.Tests/AdvancedRerankingTests.cs)
 covers serialization, subsets, validation, diagnostics, and option propagation.
 [`WebTests`](tests/SemanticReranker.Tests/WebTests.cs) exercises HTTP form binding,
-server validation, errors, and HTML encoding without Azure.
+each native button's SQL mode dispatch, missing/duplicate/invalid modes, retained
+values, server validation, errors, and HTML encoding without Azure.
 [`OriginalMovieLiveTests`](tests/SemanticReranker.Tests/OriginalMovieLiveTests.cs)
 covers the actual dataset and advanced service cases, without data writes.
 
@@ -259,3 +304,39 @@ or seed data. Screenshots stay in ignored `python/.local/`.
 For an advanced-only rerun, append `--matrix advanced` to the browser command.
 Use `--matrix baseline` for only the original cases. The default runs both;
 all selections still require `RUN_LIVE_TESTS=1`.
+
+### Focused Razor refresh validation
+
+If only Razor is running, do not use `--include-dotnet`: that shared harness
+still requires Streamlit. Leave intentionally stopped processes stopped. The
+parent can use Playwright against the already-running Razor URL with these
+selectors (no process management is required):
+
+| Element | Playwright selector |
+| --- | --- |
+| Search input | `get_by_role("textbox", name="Search input", exact=True)` |
+| Index | `get_by_role("combobox", name="Index", exact=True)` |
+| Reranker | `get_by_role("checkbox", name="Use Semantic Reranker", exact=True)` |
+| Each search | `get_by_role("button", name=<exact label above>, exact=True)` |
+| Keyword matching | `get_by_role("radio", name="all keywords", exact=True)` or `"any keywords"` |
+| Advanced disclosure | `locator("#advanced-reranking summary")` |
+| Advanced fields | `#DocumentFormat`, `#TargetPaths`, `#RerankTopK`, `#ReturnSentenceScores` |
+| Output | `#result-status`, `#candidate-count`, `#diagnostics`, `#results` |
+| Errors / diagnostics | `#search-error`, `.sentence-scores`, `.query-details summary` |
+
+Run these offline checks from the repository root after the parent rebuilds:
+
+```powershell
+dotnet test dotnet/SemanticReranker.sln --no-build --filter 'FullyQualifiedName~WebTests'
+& ./python/.venv/Scripts/python.exe -m pytest -q python/tests/unit/test_browser_harness.py
+git diff --check
+```
+
+Browser acceptance: inspect desktop and mobile widths; exercise all search
+buttons, both keyword radios, advanced text/json fields, result limits, sentence
+scores, reranker-off retained choices, and a visible error without a success
+table. Repeat native submission in a browser context with JavaScript disabled.
+Use keyboard Tab, Space, and Enter to open disclosures, select radios, and
+activate buttons. Confirm page-level horizontal overflow is absent while the
+results table can scroll. These checks require parent execution and visual
+inspection; offline HTTP assertions alone do not verify layout or live services.

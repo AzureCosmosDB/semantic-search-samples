@@ -59,12 +59,11 @@ def main():
                 for container in ("qflat", "diskann"):
                     for rerank in (False, True):
                         page.goto(url)
-                        page.locator("#Query").fill("ocean marine")
+                        page.get_by_role("textbox", name="Search input", exact=True).fill("ocean marine")
                         page.locator("#Container").select_option(container)
-                        page.locator("#Mode").select_option("FullText")
-                        page.locator("#AllKeywords").select_option("true")
+                        page.get_by_role("radio", name="all keywords", exact=True).check()
                         page.locator("#Rerank").set_checked(rerank)
-                        page.get_by_role("button", name="Search", exact=True).click()
+                        page.get_by_role("button", name="Full text search", exact=True).click()
                         page.wait_for_load_state("networkidle")
                         assert page.locator("#search-error").count() == 0
                         assert page.locator("#results tbody tr").count() > 0
@@ -79,11 +78,10 @@ def main():
                             assert score == "n/a"
                         assert "RU" in page.locator("#diagnostics").inner_text()
                         page.screenshot(path=str(private / f"dotnet-{container}-rerank-{rerank}.png"))
-                for mode in ("Vector", "Hybrid"):
+                for button in ("Similarity search", "Hybrid search"):
                     page.goto(url)
-                    page.locator("#Query").fill("ocean")
-                    page.locator("#Mode").select_option(mode)
-                    page.get_by_role("button", name="Search", exact=True).click()
+                    page.get_by_role("textbox", name="Search input", exact=True).fill("ocean")
+                    page.get_by_role("button", name=button, exact=True).click()
                     page.wait_for_load_state("networkidle")
                     assert "AZURE_OPENAI_ENDPOINT" in page.locator("#search-error").inner_text()
                     assert page.locator("#results").count() == 0

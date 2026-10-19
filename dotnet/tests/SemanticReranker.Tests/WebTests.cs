@@ -120,11 +120,110 @@ public sealed class WebTests
         using var client = app.CreateClient();
         Assert.Equal("healthy", await client.GetStringAsync("/healthz"));
         var html = await client.GetStringAsync("/");
-        Assert.Contains("Cosmos DB semantic search", html);
+        Assert.Contains("Azure Cosmos DB - Semantic Search Demo", html);
         Assert.DoesNotContain("id=\"search-error\"", html);
         Assert.Contains("<details id=\"advanced-reranking\">", html);
-        Assert.Matches("<fieldset(?=[^>]*id=\"rerank-options\")(?=[^>]*disabled)[^>]*>", html);
+        // Native HTML must work without JavaScript. The enhancement disables
+        // irrelevant controls only after load, and preserves their posted values.
+        Assert.Matches("<fieldset(?=[^>]*id=\"rerank-options\")(?![^>]*disabled)[^>]*>", html);
         Assert.Matches("<input(?=[^>]*id=\"RerankTopK\")(?=[^>]*value=\"10\")[^>]*>", html);
+        Assert.Contains("for=\"Query\">Search input</label>", html);
+        Assert.Matches("<input(?=[^>]*id=\"Query\")(?=[^>]*type=\"text\")[^>]*>", html);
+        Assert.DoesNotContain("<textarea", html);
+        Assert.DoesNotContain("id=\"Mode\"", html);
+        Assert.DoesNotMatch("<input[^>]*name=\"Mode\"", html);
+        Assert.Matches("<input(?=[^>]*type=\"radio\")(?=[^>]*name=\"AllKeywords\")(?=[^>]*value=\"true\")[^>]*>", html);
+        Assert.Matches("<input(?=[^>]*type=\"radio\")(?=[^>]*name=\"AllKeywords\")(?=[^>]*value=\"false\")[^>]*>", html);
+        Assert.Contains("Choose a search to get started", html);
+    }
+
+    [Theory]
+    [InlineData(SearchMode.Vector, "Similarity search", "ORDER BY VectorDistance")]
+    [InlineData(SearchMode.FullTextRank, "Full text ranking", "ORDER BY RANK FullTextScore")]
+    [InlineData(SearchMode.Hybrid, "Hybrid search", "ORDER BY RANK RRF")]
+    [InlineData(SearchMode.FullText, "Full text search", "FullTextContainsAll")]
+    public async Task NativeButtonPostsExactlyItsModeWithoutJavaScript(SearchMode mode, string label, string sql)
+    {
+        using var app = new TestWebApp(allowEmbeddings: true);
+        using var client = app.CreateClient();
+        var page = await client.GetStringAsync("/");
+        Assert.Matches($"<button(?=[^>]*type=\"submit\")(?=[^>]*name=\"Mode\")(?=[^>]*value=\"{mode}\")[^>]*>{label}</button>", page);
+        Assert.Equal(4, Regex.Matches(page, "<button[^>]*name=\"Mode\"").Count);
+        var html = await Post(client, mode, false);
+        Assert.DoesNotContain("id=\"search-error\"", html);
+        Assert.Contains(sql, app.LastPlan?.Sql ?? "");
+        Assert.Contains("id=\"results\"", html);
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", null)]
+    [InlineData("Unknown", null)]
+    [InlineData("99", null)]
+    [InlineData("0", null)]
+    [InlineData("Vector,Hybrid", null)]
+    [InlineData("FullText", "Hybrid")]
+    [InlineData("FullText", "FullText")]
+    public async Task MissingInvalidOrDuplicateModeFailsBeforeRetrieval(string? mode, string? secondMode)
+    {
+        using var app = new TestWebApp(allowEmbeddings: true);
+        using var client = app.CreateClient();
+        var fields = new List<KeyValuePair<string, string>>
+        {
+            new("Query", "ocean"), new("Container", "qflat"), new("Rerank", "true")
+        };
+        if (mode is not null) fields.Add(new("Mode", mode));
+        if (secondMode is not null) fields.Add(new("Mode", secondMode));
+        var html = await PostFields(client, fields);
+        Assert.Contains("Choose one of the search buttons", html);
+        Assert.Contains("role=\"alert\"", html);
+        Assert.DoesNotContain("id=\"results\"", html);
+        Assert.Null(app.LastPlan);
+        Assert.Null(app.LastRerankOptions);
+    }
+
+    [Fact]
+    public async Task AnyKeywordsAndFormValuesSurviveSuccessAndServiceError()
+    {
+        foreach (var fail in new[] { false, true })
+        {
+            using var app = new TestWebApp(failReranker: fail);
+            using var client = app.CreateClient();
+            var html = await Post(client, SearchMode.FullText, true, new()
+            {
+                ["Query"] = "ocean research", ["Container"] = "diskann", ["AllKeywords"] = "false",
+                ["DocumentFormat"] = "json", ["TargetPaths"] = "title",
+                ["RerankTopK"] = "3", ["ReturnSentenceScores"] = "true"
+            });
+            Assert.Contains("FullTextContainsAny", app.LastPlan?.Sql ?? "");
+            Assert.Equal("diskann", app.LastContainer);
+            Assert.Matches("<input(?=[^>]*id=\"Query\")(?=[^>]*value=\"ocean research\")[^>]*>", html);
+            Assert.Matches("<option(?=[^>]*value=\"diskann\")(?=[^>]*selected)[^>]*>", html);
+            Assert.Matches("<input(?=[^>]*id=\"AnyKeywords\")(?=[^>]*checked)[^>]*>", html);
+            Assert.Matches("<option(?=[^>]*value=\"json\")(?=[^>]*selected)[^>]*>", html);
+            Assert.Matches("<option(?=[^>]*value=\"title\")(?=[^>]*selected)[^>]*>", html);
+            Assert.Matches("<input(?=[^>]*id=\"RerankTopK\")(?=[^>]*value=\"3\")[^>]*>", html);
+            Assert.Matches("<input(?=[^>]*id=\"ReturnSentenceScores\")(?=[^>]*checked)[^>]*>", html);
+            Assert.Equal(fail, html.Contains("id=\"search-error\""));
+        }
+    }
+
+    [Fact]
+    public async Task RerankerOffRetainsValidAdvancedValuesWithoutUsingThem()
+    {
+        using var app = new TestWebApp();
+        using var client = app.CreateClient();
+        var html = await Post(client, SearchMode.FullText, false, new()
+        {
+            ["DocumentFormat"] = "json", ["TargetPaths"] = "title",
+            ["RerankTopK"] = "3", ["ReturnSentenceScores"] = "true"
+        });
+        Assert.Contains("Retrieval results", html);
+        Assert.Matches("<option(?=[^>]*value=\"json\")(?=[^>]*selected)[^>]*>", html);
+        Assert.Matches("<option(?=[^>]*value=\"title\")(?=[^>]*selected)[^>]*>", html);
+        Assert.Matches("<input(?=[^>]*id=\"RerankTopK\")(?=[^>]*value=\"3\")[^>]*>", html);
+        Assert.Matches("<input(?=[^>]*id=\"ReturnSentenceScores\")(?=[^>]*checked)[^>]*>", html);
+        Assert.Null(app.LastRerankOptions);
     }
 
     [Fact]
@@ -180,12 +279,8 @@ public sealed class WebTests
     private static async Task<string> Post(HttpClient client, SearchMode mode, bool rerank,
         Dictionary<string, string>? advanced = null)
     {
-        var page = await client.GetStringAsync("/");
-        var match = Regex.Match(page, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
-        Assert.True(match.Success, "Razor must emit an antiforgery token.");
         var fields = new Dictionary<string, string>
         {
-            ["__RequestVerificationToken"] = WebUtility.HtmlDecode(match.Groups[1].Value),
             ["Query"] = "ocean",
             ["Container"] = "qflat",
             ["Mode"] = mode.ToString(),
@@ -194,15 +289,27 @@ public sealed class WebTests
         };
         if (advanced is not null)
             foreach (var pair in advanced) fields[pair.Key] = pair.Value;
-        using var response = await client.PostAsync("/", new FormUrlEncodedContent(fields));
+        return await PostFields(client, fields);
+    }
+
+    private static async Task<string> PostFields(HttpClient client, IEnumerable<KeyValuePair<string, string>> fields)
+    {
+        var page = await client.GetStringAsync("/");
+        var match = Regex.Match(page, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
+        Assert.True(match.Success, "Razor must emit an antiforgery token.");
+        var submitted = fields.Append(new KeyValuePair<string, string>(
+            "__RequestVerificationToken", WebUtility.HtmlDecode(match.Groups[1].Value)));
+        using var response = await client.PostAsync("/", new FormUrlEncodedContent(submitted));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 }
 
-internal sealed class TestWebApp(bool failReranker = false) : WebApplicationFactory<Program>
+internal sealed class TestWebApp(bool failReranker = false, bool allowEmbeddings = false) : WebApplicationFactory<Program>
 {
     public RerankOptions? LastRerankOptions { get; private set; }
+    public QueryPlan? LastPlan { get; private set; }
+    public string? LastContainer { get; private set; }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -214,17 +321,35 @@ internal sealed class TestWebApp(bool failReranker = false) : WebApplicationFact
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<SampleSettings>();
-            services.AddSingleton(new SampleSettings());
+            services.AddSingleton(allowEmbeddings
+                ? new SampleSettings { OpenAiEndpoint = "https://example.invalid", OpenAiDeployment = "offline-test" }
+                : new SampleSettings());
             services.RemoveAll<IQueryExecutor>();
-            services.AddSingleton<IQueryExecutor>(new FakeQuery(
+            services.AddSingleton<IQueryExecutor>(new CapturingQuery(
                 [new("synthetic-dotnet-ocean", "The Listening Vessel", "<script>ocean</script>"),
-                 new("synthetic-dotnet-other", "Other", "<script>ocean</script>")]));
+                 new("synthetic-dotnet-other", "Other", "<script>ocean</script>")],
+                (container, plan) => { LastContainer = container; LastPlan = plan; }));
             services.RemoveAll<IEmbeddingProvider>();
-            services.AddSingleton<IEmbeddingProvider, FailingEmbedding>();
+            services.AddSingleton<IEmbeddingProvider>(allowEmbeddings ? new TestEmbedding() : new FailingEmbedding());
             services.RemoveAll<IReranker>();
             services.AddSingleton<IReranker>(failReranker ? new FailingReranker()
                 : new TestReranker(options => LastRerankOptions = options));
         });
+    }
+
+    private sealed class CapturingQuery(IReadOnlyList<SearchRow> rows, Action<string, QueryPlan> capture) : IQueryExecutor
+    {
+        public Task<QueryResult> ExecuteAsync(string container, QueryPlan plan, CancellationToken cancellationToken)
+        {
+            capture(container, plan);
+            return Task.FromResult(new QueryResult(rows, 1.25, 2));
+        }
+    }
+
+    private sealed class TestEmbedding : IEmbeddingProvider
+    {
+        public Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken) =>
+            Task.FromResult(TestData.Vector(0));
     }
 
     private sealed class TestReranker(Action<RerankOptions?> capture) : IReranker
