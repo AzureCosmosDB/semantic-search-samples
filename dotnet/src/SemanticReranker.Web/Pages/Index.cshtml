@@ -17,11 +17,11 @@
       <form method="post" id="search-form">
         <label asp-for="Container">Index</label>
         <select asp-for="Container">
-          <option value="qflat">QFLAT &amp; Full Text Search Index</option>
-          <option value="diskann">DiskANN &amp; Full Text Search Index</option>
+          <option value="qflat" data-container-name="@Model.QflatContainer">QFLAT &amp; Full Text Search Index</option>
+          <option value="diskann" data-container-name="@Model.DiskannContainer">DiskANN &amp; Full Text Search Index</option>
         </select>
         <label asp-for="Query">Search input</label>
-        <input asp-for="Query" type="text" maxlength="1000" placeholder="James Bond" required aria-describedby="search-input-help" />
+        <input asp-for="Query" type="text" maxlength="1000" placeholder="SPECTRE spy" required aria-describedby="search-input-help" />
         <p class="help-text" id="search-input-help">Enter a phrase or keywords, then choose a search below.</p>
         <label class="checkbox"><input asp-for="Rerank" /> Use Semantic Reranker</label>
         <details id="advanced-reranking" open="@(Model.ErrorMessage is not null && Model.Rerank)">
@@ -67,6 +67,20 @@
         <h1>Azure Cosmos DB - Semantic Search Demo</h1>
         <p>Explore vector search, full text search, text ranking, and hybrid search. Compare retrieval results with optional semantic reranking.</p>
       </header>
+      <section id="dataset-summary" aria-labelledby="dataset-heading">
+        <h2 id="dataset-heading">Bundled default dataset</h2>
+        <p>10 original movie plots spanning spy thrillers, space rescue, ocean exploration, romance, and family adventures.
+          <a href="https://github.com/TheovanKraay/semantic-search-samples/blob/feat/python-dotnet-standalone-reranker/python/sample-data/movies.original.json">View bundled movie source</a></p>
+        <p>Default <code>azd up</code> seeds these movies with real embeddings into the sample containers.
+          With custom data, use searches suited to your documents.
+          This describes the bundled fixture, not a live inventory of the selected container.</p>
+        <p><strong>Example searches for the bundled movies:</strong>
+          Full text: <code>SPECTRE spy</code> or <code>whale songs</code>.
+          Similarity / hybrid: <code>astronauts stranded on an orbital station</code>.</p>
+        <p class="dataset-config">Configured database: <span>@Model.ConfiguredDatabase</span>
+          <span aria-hidden="true"> | </span> Selected container: <span id="selected-container">@Model.SelectedContainer</span></p>
+        <noscript><p class="help-text">The selected container label updates when you submit a search.</p></noscript>
+      </section>
       <section aria-label="Search results">
       @if (Model.ErrorMessage is not null)
       {

@@ -79,6 +79,21 @@ README for azd environment switching. Never log tokens or commit local config.
 
 ## Using the search UI
 
+The main area keeps a compact **Bundled default dataset** summary above results,
+including after a search or an error. It describes the ten original movie plots
+in [`movies.original.json`](../python/sample-data/movies.original.json), with a
+source link to this repository's feature branch. There is no preview table.
+Default `azd up` seeds these movies with real embeddings into the sample
+containers. This is not a live inventory of your selected container.
+With custom data, use searches suited to your documents.
+
+The database and container labels use the existing `SampleSettings`, with no
+client resolution, database reads, or endpoint display. The selected container
+label follows the Index control; without JavaScript it updates on submission.
+Try `SPECTRE spy` or `whale songs` with Full text search, or
+`astronauts stranded on an orbital station` with Similarity or Hybrid search.
+These examples describe the bundled plots, not guaranteed results for custom data.
+
 The light sidebar follows the Streamlit control order: **Index**, single-line
 **Search input**, **Use Semantic Reranker**, collapsed **Advanced reranking**,
 then the separate search buttons. There is no mode dropdown or generic Search

@@ -11,6 +11,63 @@ namespace SemanticReranker.Tests;
 // HTTP contract tests use test doubles. They are not evidence of live Azure behavior.
 public sealed class WebTests
 {
+    private static void AssertDatasetSummary(string html, string container = "reranker_dotnet_qflat",
+        string database = "Not configured")
+    {
+        var summary = Regex.Match(html, "<section id=\"dataset-summary\"[\\s\\S]*?</section>");
+        Assert.True(summary.Success, "Dataset summary must be outside the conditional search results.");
+        Assert.Contains("Bundled default dataset", summary.Value);
+        Assert.Contains("10 original movie plots", summary.Value);
+        Assert.Contains("href=\"https://github.com/TheovanKraay/semantic-search-samples/blob/feat/python-dotnet-standalone-reranker/python/sample-data/movies.original.json\"", summary.Value);
+        Assert.Contains("SPECTRE spy", summary.Value);
+        Assert.Contains("whale songs", summary.Value);
+        Assert.Contains("astronauts stranded on an orbital station", summary.Value);
+        Assert.Contains("azd up", summary.Value);
+        Assert.Contains("custom data", summary.Value);
+        Assert.Contains("not a live inventory", summary.Value);
+        Assert.Contains($"Configured database: <span>{database}</span>", summary.Value);
+        Assert.Contains($"id=\"selected-container\">{container}</span>", summary.Value);
+        Assert.DoesNotContain("<table", summary.Value);
+        Assert.True(html.IndexOf("id=\"dataset-summary\"", StringComparison.Ordinal) >
+                    html.IndexOf("<main", StringComparison.Ordinal));
+        Assert.True(html.IndexOf("id=\"dataset-summary\"", StringComparison.Ordinal) <
+                    html.IndexOf("aria-label=\"Search results\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task DatasetSummaryUsesConfiguredNamesWithoutRetrievalAndTracksPostedSelection()
+    {
+        using var app = new TestWebApp(settings: new SampleSettings
+        {
+            Database = "custom-movies",
+            QflatContainer = "custom-qflat",
+            DiskannContainer = "custom-diskann",
+            CosmosEndpoint = "https://private-endpoint.invalid",
+            OpenAiKey = "private-key"
+        });
+        using var client = app.CreateClient();
+        var page = await client.GetStringAsync("/");
+        AssertDatasetSummary(page, "custom-qflat", "custom-movies");
+        Assert.Null(app.LastPlan);
+        Assert.Contains("data-container-name=\"custom-diskann\"", page);
+        Assert.DoesNotContain("private-endpoint", page);
+        Assert.DoesNotContain("private-key", page);
+        var html = await Post(client, SearchMode.FullText, false, new() { ["Container"] = "diskann" });
+        AssertDatasetSummary(html, "custom-diskann", "custom-movies");
+        Assert.Equal("diskann", app.LastContainer);
+    }
+
+    [Fact]
+    public async Task InvalidContainerDoesNotBreakDatasetSummary()
+    {
+        using var app = new TestWebApp();
+        using var client = app.CreateClient();
+        var html = await Post(client, SearchMode.FullText, false, new() { ["Container"] = "invalid" });
+        AssertDatasetSummary(html, "Select a valid index");
+        Assert.Contains("id=\"search-error\"", html);
+        Assert.Null(app.LastPlan);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -27,6 +84,7 @@ public sealed class WebTests
         Assert.Contains("&lt;script&gt;", html);
         Assert.DoesNotContain("<script>", html);
         Assert.DoesNotContain("id=\"search-error\"", html);
+        AssertDatasetSummary(html);
     }
 
     [Fact]
@@ -39,6 +97,7 @@ public sealed class WebTests
         Assert.Contains("Reranking failed", html);
         Assert.DoesNotContain("id=\"results\"", html);
         Assert.DoesNotContain("private endpoint", html);
+        AssertDatasetSummary(html);
     }
 
     [Theory]
@@ -135,6 +194,8 @@ public sealed class WebTests
         Assert.Matches("<input(?=[^>]*type=\"radio\")(?=[^>]*name=\"AllKeywords\")(?=[^>]*value=\"true\")[^>]*>", html);
         Assert.Matches("<input(?=[^>]*type=\"radio\")(?=[^>]*name=\"AllKeywords\")(?=[^>]*value=\"false\")[^>]*>", html);
         Assert.Contains("Choose a search to get started", html);
+        AssertDatasetSummary(html);
+        Assert.Null(app.LastPlan);
     }
 
     [Theory]
@@ -153,6 +214,7 @@ public sealed class WebTests
         Assert.DoesNotContain("id=\"search-error\"", html);
         Assert.Contains(sql, app.LastPlan?.Sql ?? "");
         Assert.Contains("id=\"results\"", html);
+        AssertDatasetSummary(html);
     }
 
     [Theory]
@@ -305,7 +367,8 @@ public sealed class WebTests
     }
 }
 
-internal sealed class TestWebApp(bool failReranker = false, bool allowEmbeddings = false) : WebApplicationFactory<Program>
+internal sealed class TestWebApp(bool failReranker = false, bool allowEmbeddings = false,
+    SampleSettings? settings = null) : WebApplicationFactory<Program>
 {
     public RerankOptions? LastRerankOptions { get; private set; }
     public QueryPlan? LastPlan { get; private set; }
@@ -321,9 +384,9 @@ internal sealed class TestWebApp(bool failReranker = false, bool allowEmbeddings
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<SampleSettings>();
-            services.AddSingleton(allowEmbeddings
+            services.AddSingleton(settings ?? (allowEmbeddings
                 ? new SampleSettings { OpenAiEndpoint = "https://example.invalid", OpenAiDeployment = "offline-test" }
-                : new SampleSettings());
+                : new SampleSettings()));
             services.RemoveAll<IQueryExecutor>();
             services.AddSingleton<IQueryExecutor>(new CapturingQuery(
                 [new("synthetic-dotnet-ocean", "The Listening Vessel", "<script>ocean</script>"),

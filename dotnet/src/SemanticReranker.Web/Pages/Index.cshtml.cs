@@ -18,6 +18,17 @@ public sealed class IndexModel(IServiceProvider services) : PageModel
     [BindProperty] public bool ReturnSentenceScores { get; set; }
     public SearchResult? Result { get; private set; }
     public string? ErrorMessage { get; private set; }
+    // Already-registered configuration only. Never resolve service clients for the summary.
+    private SampleSettings Settings => services.GetRequiredService<SampleSettings>();
+    public string ConfiguredDatabase => Settings.Database ?? "Not configured";
+    public string QflatContainer => Settings.QflatContainer;
+    public string DiskannContainer => Settings.DiskannContainer;
+    public string SelectedContainer => Container switch
+    {
+        "qflat" => QflatContainer,
+        "diskann" => DiskannContainer,
+        _ => "Select a valid index"
+    };
     public void OnGet() { }
 
     public async Task OnPostAsync()

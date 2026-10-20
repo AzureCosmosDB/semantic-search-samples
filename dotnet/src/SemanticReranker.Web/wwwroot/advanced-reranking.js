@@ -5,6 +5,15 @@
   const fields = document.getElementById("TargetPaths");
   const options = document.getElementById("rerank-options");
   const form = document.getElementById("search-form");
+  const container = document.getElementById("Container");
+  const selectedContainer = document.getElementById("selected-container");
+  // The option carries only its configured name, not dataset metadata or an endpoint.
+  if (container && selectedContainer) {
+    container.addEventListener("change", () => {
+      selectedContainer.textContent =
+        container.selectedOptions[0]?.dataset.containerName ?? "Select a valid index";
+    });
+  }
   function update() {
     options.disabled = !rerank.checked;
     fields.disabled = !rerank.checked || format.value !== "json";
