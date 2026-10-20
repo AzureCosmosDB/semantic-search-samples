@@ -17,7 +17,14 @@ no alias or replacement authentication flow is needed.
 ## Requirements and layout
 
 Recommended for a clean clone: [root azd up quickstart](../README.md#deploy-and-start).
-It includes real embeddings and original movies. The root launcher starts both
+It restores the full MovieLens 4,489-source-row corpus with real 1536-dimensional
+embeddings. Duplicate source movie IDs survive in deterministic row-indexed
+document IDs; original metadata/IDs and source/model provenance are retained.
+The [root restoration contract](../README.md#movielens-source-and-migration-boundary)
+covers pinned bytes/checksum, resumable embedding cache, full readback and the
+explicit conditional cleanup of only the ten unchanged old fixture records.
+The home summary describes the source corpus, not a live custom-container count.
+The root launcher starts both
 apps. Use `OriginalMovieLiveTests` and `python/scripts/verify_browser.py --include-dotnet`
 for the new real-embedding matrix. The older manual/synthetic validation below
 remains a separate integration and error-path workflow.

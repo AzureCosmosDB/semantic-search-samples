@@ -24,7 +24,7 @@ public sealed class OriginalMovieLiveTests
         ];
         foreach (var selector in new[] { "qflat", "diskann" })
         {
-            var request = new SearchRequest("SPECTRE spy", selector, SearchMode.Vector);
+            var request = new SearchRequest("Woody Buzz", selector, SearchMode.Vector);
             var baseline = await service.SearchAsync(request, timeout.Token);
             Assert.NotEmpty(baseline.Rows);
             foreach (var options in cases)
@@ -74,24 +74,27 @@ public sealed class OriginalMovieLiveTests
         foreach (var selector in new[] { "qflat", "diskann" })
         {
             await store.ValidateContainerAsync(selector, timeout.Token);
-            var original = await store.ReadAsync(selector, "original-movies-v1-spectre", timeout.Token);
-            Assert.Equal("The SPECTRE Signal", original.Title);
+            var original = await store.ReadAsync(selector, "movielens-4489-v1-0001-862", timeout.Token);
+            Assert.Equal("Toy Story", original.Title);
             QueryBuilder.ValidateVector(original.Embedding);
             foreach (var mode in Enum.GetValues<SearchMode>())
             foreach (var enabled in new[] { false, true })
             foreach (var all in mode == SearchMode.FullText ? new[] { false, true } : new[] { true })
             {
                 var result = await service.SearchAsync(
-                    new("SPECTRE spy", selector, mode, AllKeywords: all, Rerank: enabled), timeout.Token);
+                    new("Woody Buzz", selector, mode, AllKeywords: all, Rerank: enabled), timeout.Token);
                 Assert.NotEmpty(result.Rows);
                 Assert.Equal(enabled, result.Reranked);
                 Assert.True(result.RequestCharge > 0);
                 Assert.Equal(result.Rows.Count, result.Rows.Select(row => row.Id).Distinct().Count());
-                var position = result.Rows.ToList().FindIndex(row => row.Id == "original-movies-v1-spectre");
-                Assert.True(position >= 0, $"SPECTRE missing: {selector}/{mode}/{enabled}/{all}");
-                if (mode != SearchMode.FullText || enabled)
+                Assert.InRange(result.Rows.Count, 1, 10); // Candidate limit, not dataset count.
+                var position = result.Rows.ToList().FindIndex(row => row.Id == "movielens-4489-v1-0001-862");
+                // Any-keyword filtering can match more than ten rows and has no ordering.
+                if (mode != SearchMode.FullText || all)
+                    Assert.True(position >= 0, $"Toy Story missing: {selector}/{mode}/{enabled}/{all}");
+                if (mode != SearchMode.FullText)
                     Assert.True(position < 3,
-                        $"SPECTRE outside top 3: {selector}/{mode}/{enabled}; " +
+                        $"Toy Story outside top 3: {selector}/{mode}/{enabled}; " +
                         $"SQL: {result.Sql}; IDs: {string.Join(", ", result.Rows.Select(row => row.Id))}");
                 if (mode is SearchMode.Vector or SearchMode.Hybrid)
                     Assert.True(result.EmbeddingMilliseconds > 0);

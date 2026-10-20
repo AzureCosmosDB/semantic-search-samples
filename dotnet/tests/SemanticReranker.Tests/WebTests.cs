@@ -16,12 +16,13 @@ public sealed class WebTests
     {
         var summary = Regex.Match(html, "<section id=\"dataset-summary\"[\\s\\S]*?</section>");
         Assert.True(summary.Success, "Dataset summary must be outside the conditional search results.");
-        Assert.Contains("Bundled default dataset", summary.Value);
-        Assert.Contains("10 original movie plots", summary.Value);
-        Assert.Contains("href=\"https://github.com/TheovanKraay/semantic-search-samples/blob/feat/python-dotnet-standalone-reranker/python/sample-data/movies.original.json\"", summary.Value);
-        Assert.Contains("SPECTRE spy", summary.Value);
-        Assert.Contains("whale songs", summary.Value);
-        Assert.Contains("astronauts stranded on an orbital station", summary.Value);
+        Assert.Contains("Default source corpus: MovieLens", summary.Value);
+        Assert.Contains("4,489 source rows", summary.Value);
+        Assert.DoesNotContain("10 original movie plots", summary.Value);
+        Assert.Contains("href=\"https://github.com/TheovanKraay/AzureDataRetrievalAugmentedGenerationSamples/blob/7fd162fc633617857f8b8ed2c5b2b92d4d8ef0b6/DataSet/Movies/MovieLens-4489-256D.json\"", summary.Value);
+        Assert.Contains("Woody Buzz", summary.Value);
+        Assert.Contains("fishing buddies", summary.Value);
+        Assert.Contains("toys learning to share a child's affection", summary.Value);
         Assert.Contains("azd up", summary.Value);
         Assert.Contains("custom data", summary.Value);
         Assert.Contains("not a live inventory", summary.Value);

@@ -21,7 +21,7 @@
           <option value="diskann" data-container-name="@Model.DiskannContainer">DiskANN &amp; Full Text Search Index</option>
         </select>
         <label asp-for="Query">Search input</label>
-        <input asp-for="Query" type="text" maxlength="1000" placeholder="SPECTRE spy" required aria-describedby="search-input-help" />
+        <input asp-for="Query" type="text" maxlength="1000" placeholder="Woody Buzz" required aria-describedby="search-input-help" />
         <p class="help-text" id="search-input-help">Enter a phrase or keywords, then choose a search below.</p>
         <label class="checkbox"><input asp-for="Rerank" /> Use Semantic Reranker</label>
         <details id="advanced-reranking" open="@(Model.ErrorMessage is not null && Model.Rerank)">
@@ -68,15 +68,15 @@
         <p>Explore vector search, full text search, text ranking, and hybrid search. Compare retrieval results with optional semantic reranking.</p>
       </header>
       <section id="dataset-summary" aria-labelledby="dataset-heading">
-        <h2 id="dataset-heading">Bundled default dataset</h2>
-        <p>10 original movie plots spanning spy thrillers, space rescue, ocean exploration, romance, and family adventures.
-          <a href="https://github.com/TheovanKraay/semantic-search-samples/blob/feat/python-dotnet-standalone-reranker/python/sample-data/movies.original.json">View bundled movie source</a></p>
-        <p>Default <code>azd up</code> seeds these movies with real embeddings into the sample containers.
+        <h2 id="dataset-heading">Default source corpus: MovieLens</h2>
+        <p>4,489 source rows of movie metadata and plot overviews, including Toy Story and Grumpier Old Men.
+          <a href="https://github.com/TheovanKraay/AzureDataRetrievalAugmentedGenerationSamples/blob/7fd162fc633617857f8b8ed2c5b2b92d4d8ef0b6/DataSet/Movies/MovieLens-4489-256D.json">View pinned MovieLens source</a></p>
+        <p>Default <code>azd up</code> restores every source row with fresh 1536-dimensional embeddings.
           With custom data, use searches suited to your documents.
-          This describes the bundled fixture, not a live inventory of the selected container.</p>
-        <p><strong>Example searches for the bundled movies:</strong>
-          Full text: <code>SPECTRE spy</code> or <code>whale songs</code>.
-          Similarity / hybrid: <code>astronauts stranded on an orbital station</code>.</p>
+          This describes the source corpus, not a live inventory of the selected container.</p>
+        <p><strong>Example searches for MovieLens:</strong>
+          Full text: <code>Woody Buzz</code> or <code>fishing buddies</code>.
+          Similarity / hybrid: <code>toys learning to share a child's affection</code>.</p>
         <p class="dataset-config">Configured database: <span>@Model.ConfiguredDatabase</span>
           <span aria-hidden="true"> | </span> Selected container: <span id="selected-container">@Model.SelectedContainer</span></p>
         <noscript><p class="help-text">The selected container label updates when you submit a search.</p></noscript>

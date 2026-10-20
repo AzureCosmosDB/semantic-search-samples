@@ -36,15 +36,23 @@ and not a method on `Microsoft.Azure.Cosmos.Container`.
   and location for the mandatory authenticated inference GET. Only HTTP 404
   permits creation. Existing compatible accounts must not receive another PUT.
 - `postprovision`: generate private local configuration only.
-- `postup`: generate real embeddings and seed the bounded original dataset.
+- `postup`: restore the full pinned MovieLens corpus with real embeddings.
   Azure OpenAI is provisioned by the default infrastructure, not an optional
   manual prerequisite for this path.
 
-- Default `azd up` explicitly authorizes `postup` to seed only the ten tracked
-  original movie records in `python/sample-data/movies.original.json` into all
-  four dedicated sample containers with real embeddings. Stable
-  `original-movies-v1-` IDs and ownership markers protect unrelated records.
-  No deletes or synthetic replacements. `postprovision` remains config-only.
+- Default `azd up` explicitly authorizes `postup` to restore all 4,489 source
+  rows from the pinned fork MovieLens file into all four dedicated sample
+  containers. Preserve duplicate source movie IDs with deterministic one-based
+  source-row IDs in `movielens-4489-v1-`; retain original metadata and movie ID.
+  Validate pinned raw bytes/hash/count, discard source 256-dimensional vectors,
+  and cache real 1536-dimensional embeddings under ignored `.local/`.
+  Only after ALL targets pass complete readback may the explicit hook flag
+  remove the exact ten unchanged `original-movies-v1-` fixture IDs with matching
+  source data, ownership, provenance and conditional etags. This narrowly
+  supersedes the former ten-row/no-delete default. Never delete by prefix,
+  delete changed/foreign records, truncate, silently dedupe, or seed on startup.
+  The ten-row fixture remains smoke/offline test data, never the default corpus.
+  `postprovision` remains config-only.
   Root `pwsh ./scripts/start.ps1` supervises both local apps without data writes.
   This default path supersedes the older manual quickstart below.
 

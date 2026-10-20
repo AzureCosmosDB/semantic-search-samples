@@ -8,8 +8,8 @@ existing-resource/synthetic-fixture workflow. That loader is not required here.
 ## Deploy once with azd up
 
 From the **repository root**, use `azd up`. This remains the deployment entry
-point: dependencies, keyless backend, generated config, and the bounded real
-movie seed. `azd provision` alone does not seed. No new resources are needed for
+point: dependencies, keyless backend, generated config, and full MovieLens
+restoration. `azd provision` alone does not seed. No new resources are needed for
 advanced reranking. App startup and search requests never provision or write data.
 
 `pwsh ./scripts/start.ps1` normally starts both apps in the foreground.
@@ -79,10 +79,10 @@ README for azd environment switching. Never log tokens or commit local config.
 
 ## Using the search UI
 
-The main area keeps a compact **Bundled default dataset** summary above results,
-including after a search or an error. It describes the ten original movie plots
-in [`movies.original.json`](../python/sample-data/movies.original.json), with a
-source link to this repository's feature branch. There is no preview table.
+The main area keeps a compact **Default source corpus: MovieLens** summary above results,
+including after a search or an error. It describes all 4,489 source rows
+in the [pinned original MovieLens file](https://github.com/TheovanKraay/AzureDataRetrievalAugmentedGenerationSamples/blob/7fd162fc633617857f8b8ed2c5b2b92d4d8ef0b6/DataSet/Movies/MovieLens-4489-256D.json).
+The ten-row fixture is smoke/offline data only. There is no preview table.
 Default `azd up` seeds these movies with real embeddings into the sample
 containers. This is not a live inventory of your selected container.
 With custom data, use searches suited to your documents.
@@ -90,14 +90,17 @@ With custom data, use searches suited to your documents.
 The database and container labels use the existing `SampleSettings`, with no
 client resolution, database reads, or endpoint display. The selected container
 label follows the Index control; without JavaScript it updates on submission.
-Try `SPECTRE spy` or `whale songs` with Full text search, or
-`astronauts stranded on an orbital station` with Similarity or Hybrid search.
-These examples describe the bundled plots, not guaranteed results for custom data.
+Try `Woody Buzz` or `fishing buddies` with Full text search, or
+`toys learning to share a child's affection` with Similarity or Hybrid search.
+These examples describe Toy Story and Grumpier Old Men, not guaranteed results for custom data.
+Read [the restoration contract](../README.md#movielens-source-and-migration-boundary)
+for duplicate-ID preservation, cache/resume, provenance and conditional cleanup.
+The 10-candidate search limit is not the size of the source corpus.
 
 The light sidebar follows the Streamlit control order: **Index**, single-line
 **Search input**, **Use Semantic Reranker**, collapsed **Advanced reranking**,
 then the separate search buttons. There is no mode dropdown or generic Search
-button. Enter keywords such as `SPECTRE spy`, then choose:
+button. Enter keywords such as `Woody Buzz`, then choose:
 
 | Button label | Submitted `Mode` | Retrieval behavior |
 | --- | --- | --- |
@@ -173,7 +176,7 @@ Full-text search splits the input into whitespace-separated keywords.
 
 All keywords means every supplied keyword must match. This is **not** a
 natural-language rewrite service. Extra words can reduce matches; compare
-`SPECTRE spy` with a longer sentence and try Any keyword. Title is not part of
+`Woody Buzz` with a longer sentence and try Any keyword. Title is not part of
 this filter. Boolean filtering does not promise relevance order.
 Neither this mode nor full-text ranking needs an embedding call.
 
@@ -261,9 +264,10 @@ or a total monetary cost. Embedding and reranking invoke separate services.
 Their elapsed times are separate from retrieval and total end-to-end time;
 Azure OpenAI tokens and inference usage are not included in Cosmos RU.
 
-The actual dataset is [`movies.original.json`](../python/sample-data/movies.original.json):
-ten short original records with stable `original-movies-v1-` IDs and real
-embedding provenance. The deployment's authorized seed path supplies it.
+The default is the full pinned MovieLens corpus with stable `movielens-4489-v1-`
+row-indexed IDs and source/embedding provenance. The deployment's authorized
+seed path supplies all 4,489 rows. [`movies.original.json`](../python/sample-data/movies.original.json)
+is only a smoke fixture and exact legacy-cleanup reference, not the default.
 Synthetic fixtures in the legacy tests verify contracts, not embedding quality.
 
 | Symptom | Check |

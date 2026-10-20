@@ -4,7 +4,7 @@ Run from the repository root with [the root quickstart](../../README.md).
 This subscription-scope entry point calls the shared Python backend module
 with `includeDotnet: true`, creating both Python and .NET container pairs.
 It also provisions a keyless Azure OpenAI account named `aoai-<persisted-GUID>`
-and the configured embedding deployment. Both local apps and the bounded seed
+and the configured embedding deployment. Both local apps and the MovieLens loader
 use the same deployment.
 
 ## Default lifecycle
@@ -14,7 +14,7 @@ use the same deployment.
 | `preup` | Bootstrap dependencies, persist/reuse `AZURE_COSMOS_ACCOUNT_NAME`, reset `AZURE_CREATE_INFERENCE=false`. No authentication, Azure requests or guessed subscription/location. |
 | `preprovision` | Use azd's resolved selection for the mandatory authenticated inference GET. Only HTTP 404 authorizes creation; compatible existing accounts are reused without PUT. |
 | `postprovision` | Generate private config only, including embedding settings. |
-| `postup` | Batch real embeddings and upsert ten `original-movies-v1-` records into each dedicated container; preserve unrelated data. |
+| `postup` | Restore all 4,489 pinned MovieLens source rows with cached real embeddings, verify every expected record in every dedicated container, then conditionally remove only the exact ten unchanged legacy fixtures. Preserve unrelated data. |
 
 `azd up` performs this default flow. `pwsh ./scripts/start.ps1` loads root config
 and supervises both apps without writes. No manual loader or prior `azd init`

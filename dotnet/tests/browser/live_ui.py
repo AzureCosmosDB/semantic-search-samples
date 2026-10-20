@@ -1,4 +1,8 @@
-"""Real browser validation. Starts/stops only its own .NET process; never provisions or loads data."""
+"""Legacy three-row synthetic fixture browser checks, NOT the default MovieLens matrix.
+
+Starts/stops only its own .NET process; never provisions or loads data.
+For MovieLens use python/scripts/verify_browser.py --include-dotnet.
+"""
 import os
 import signal
 import math
