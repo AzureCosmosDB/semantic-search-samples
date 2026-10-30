@@ -5,7 +5,7 @@ using SemanticReranker.Core;
 namespace SemanticReranker.Web.Pages;
 
 // Resolve the search service only on POST so the UI starts without credentials or configuration.
-public sealed class IndexModel(IServiceProvider services) : PageModel
+public sealed class IndexModel(IServiceProvider services, ILogger<IndexModel> logger) : PageModel
 {
     [BindProperty] public string Query { get; set; } = "";
     [BindProperty] public string Container { get; set; } = "qflat";
@@ -97,8 +97,21 @@ public sealed class IndexModel(IServiceProvider services) : PageModel
                 throw new SampleException("Configure AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_EMBEDDING_DEPLOYMENT for vector/hybrid search. Full-text search does not require OpenAI.");
             Result = await services.GetRequiredService<SearchService>().SearchAsync(request, timeout.Token);
         }
-        catch (SampleException ex) { ErrorMessage = ex.Message; }
-        catch (OperationCanceledException) { ErrorMessage = "Search timed out or was cancelled. No success results were returned."; }
-        catch (Exception) { ErrorMessage = "Search failed. Check service configuration and permissions. No success results were returned."; }
+        catch (SampleException ex)
+        {
+            if (ex.InnerException is not null)
+                logger.LogError(ex, "Search failed.");
+            ErrorMessage = ex.Message;
+        }
+        catch (OperationCanceledException ex)
+        {
+            logger.LogInformation(ex, "Search timed out or was cancelled.");
+            ErrorMessage = "Search timed out or was cancelled. No success results were returned.";
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected search failure.");
+            ErrorMessage = "Search failed. Check service configuration and permissions. No success results were returned.";
+        }
     }
 }

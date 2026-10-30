@@ -4,7 +4,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using SemanticReranker.Core;
+using SemanticReranker.Web.Pages;
+using System.Collections.Concurrent;
 
 namespace SemanticReranker.Tests;
 
@@ -99,6 +102,42 @@ public sealed class WebTests
         Assert.DoesNotContain("id=\"results\"", html);
         Assert.DoesNotContain("private endpoint", html);
         AssertDatasetSummary(html);
+        var entry = Assert.Single(app.Logger.Entries);
+        Assert.Equal(LogLevel.Error, entry.Level);
+        var exception = Assert.IsType<SampleException>(entry.Exception);
+        Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("private endpoint and service details", exception.ToString());
+        Assert.Contains(nameof(FailingReranker), exception.ToString());
+    }
+
+    [Fact]
+    public async Task ServiceResolutionFailureIsLoggedWithoutLeakingToBrowser()
+    {
+        var failure = new InvalidOperationException("private credential configuration detail");
+        using var app = new TestWebApp(resolutionFailure: failure);
+        using var client = app.CreateClient();
+        var html = await Post(client, SearchMode.FullText, false);
+        Assert.Contains("Search failed", html);
+        Assert.DoesNotContain("id=\"results\"", html);
+        Assert.DoesNotContain("private credential", html);
+        var entry = Assert.Single(app.Logger.Entries);
+        Assert.Equal(LogLevel.Error, entry.Level);
+        Assert.Same(failure, entry.Exception);
+    }
+
+    [Fact]
+    public async Task CancelledSearchIsLoggedWithoutLeakingToBrowser()
+    {
+        var failure = new OperationCanceledException("private cancellation detail");
+        using var app = new TestWebApp(resolutionFailure: failure);
+        using var client = app.CreateClient();
+        var html = await Post(client, SearchMode.FullText, false);
+        Assert.Contains("Search timed out or was cancelled", html);
+        Assert.DoesNotContain("id=\"results\"", html);
+        Assert.DoesNotContain("private cancellation", html);
+        var entry = Assert.Single(app.Logger.Entries);
+        Assert.Equal(LogLevel.Information, entry.Level);
+        Assert.Same(failure, entry.Exception);
     }
 
     [Theory]
@@ -369,8 +408,9 @@ public sealed class WebTests
 }
 
 internal sealed class TestWebApp(bool failReranker = false, bool allowEmbeddings = false,
-    SampleSettings? settings = null) : WebApplicationFactory<Program>
+    SampleSettings? settings = null, Exception? resolutionFailure = null) : WebApplicationFactory<Program>
 {
+    public CapturingPageLogger Logger { get; } = new();
     public RerankOptions? LastRerankOptions { get; private set; }
     public QueryPlan? LastPlan { get; private set; }
     public string? LastContainer { get; private set; }
@@ -384,6 +424,7 @@ internal sealed class TestWebApp(bool failReranker = false, bool allowEmbeddings
         builder.UseContentRoot(Path.Combine(directory.FullName, "src", "SemanticReranker.Web"));
         builder.ConfigureServices(services =>
         {
+            services.AddSingleton<ILogger<IndexModel>>(Logger);
             services.RemoveAll<SampleSettings>();
             services.AddSingleton(settings ?? (allowEmbeddings
                 ? new SampleSettings { OpenAiEndpoint = "https://example.invalid", OpenAiDeployment = "offline-test" }
@@ -398,7 +439,22 @@ internal sealed class TestWebApp(bool failReranker = false, bool allowEmbeddings
             services.RemoveAll<IReranker>();
             services.AddSingleton<IReranker>(failReranker ? new FailingReranker()
                 : new TestReranker(options => LastRerankOptions = options));
+            if (resolutionFailure is not null)
+            {
+                services.RemoveAll<SearchService>();
+                services.AddSingleton<SearchService>(_ => throw resolutionFailure);
+            }
         });
+    }
+
+    internal sealed class CapturingPageLogger : ILogger<IndexModel>
+    {
+        public ConcurrentQueue<(LogLevel Level, Exception? Exception)> Entries { get; } = new();
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Enqueue((logLevel, exception));
     }
 
     private sealed class CapturingQuery(IReadOnlyList<SearchRow> rows, Action<string, QueryPlan> capture) : IQueryExecutor

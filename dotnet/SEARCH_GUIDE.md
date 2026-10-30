@@ -282,6 +282,29 @@ Synthetic fixtures in the legacy tests verify contracts, not embedding quality.
 | Config appears unchanged | Stop the old process, reload root `.local/azd-env.ps1`, restart. This app does not load `.env`. |
 | Build output locked or port busy | Stop only the supervisor/manual process you own, then rebuild or choose another port. |
 
+### Finding the original error
+
+The browser shows only the sample's safe error message, never raw SDK exceptions.
+For embedding, retrieval, reranking, or unexpected failures, check the terminal
+running the Razor app. ASP.NET Core logs the exception and its original stack and
+inner-exception chain once at the web boundary. Cancellation is logged at
+Information level rather than as a service failure. Ordinary input validation
+still returns a friendly message without an error log.
+
+`SampleException.InnerException` retains the original exception object, including
+any SDK status, error code, request ID, and diagnostics it provides. Inspect that
+object in a debugger if a field is not included in the exception's text. Container
+policy parsing failures retain their original cause too. The explicit .NET
+fixture loader prints full exception details to stderr and exits with code 1;
+it never converts a failed load into success or attempts rollback.
+
+These are **developer diagnostics**, not browser output. Provider exceptions can
+contain endpoints, identifiers, response details, or other sensitive information.
+Keep captured logs under ignored `.local/`, restrict access, and review/redact
+before sharing. The sample does not explicitly log search queries, documents,
+credentials, or configuration values. Do not copy raw diagnostic logs into an
+issue, PR, or screenshot.
+
 ## Verification map
 
 From the repository root, after stopping owned apps before the build:

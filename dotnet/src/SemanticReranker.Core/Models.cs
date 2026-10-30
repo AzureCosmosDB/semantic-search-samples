@@ -51,7 +51,8 @@ public sealed record SearchResult(
     bool Reranked, string Sql, int RetrievedCount = 0, bool SentenceScoresRequested = false);
 
 // Only messages intentionally safe for the UI should use this exception.
-public sealed class SampleException(string message) : Exception(message) { }
+public sealed class SampleException(string message, Exception? innerException = null)
+    : Exception(message, innerException) { }
 
 public interface IEmbeddingProvider
 {

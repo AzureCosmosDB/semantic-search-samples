@@ -98,7 +98,7 @@ public static class ContainerPolicy
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or FormatException)
         {
-            throw new SampleException("Existing container is missing required policies. No resources were changed. See explicit container setup.");
+            throw new SampleException("Existing container is missing required policies. No resources were changed. See explicit container setup.", ex);
         }
     }
 }

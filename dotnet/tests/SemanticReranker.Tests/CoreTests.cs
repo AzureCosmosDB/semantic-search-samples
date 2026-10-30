@@ -142,6 +142,49 @@ public class CoreTests
         Assert.DoesNotContain("private", ex.Message);
     }
 
+    [Theory]
+    [InlineData("embedding")]
+    [InlineData("retrieval")]
+    [InlineData("reranking")]
+    public async Task ServiceFailuresRetainOriginalExceptionAndDiagnostics(string stage)
+    {
+        var cause = new Azure.RequestFailedException(429, "private provider detail", "TooManyRequests",
+            new InvalidOperationException("nested transport detail"));
+        cause.Data["activity-id"] = "test-activity-id";
+        var dependency = new ThrowingDependency(stage, cause);
+        var service = new SearchService(dependency, dependency, dependency);
+        var error = await Assert.ThrowsAsync<SampleException>(() =>
+            service.SearchAsync(new("ocean", "qflat", SearchMode.Hybrid, Rerank: true)));
+
+        Assert.Same(cause, error.InnerException);
+        Assert.Equal(429, cause.Status);
+        Assert.Equal("TooManyRequests", cause.ErrorCode);
+        Assert.Equal("test-activity-id", error.InnerException!.Data["activity-id"]);
+        Assert.Contains(nameof(ThrowingDependency), cause.StackTrace);
+        Assert.Contains("nested transport detail", error.ToString());
+        Assert.DoesNotContain("private", error.Message);
+        Assert.Contains(stage, error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("embedding", false)]
+    [InlineData("retrieval", false)]
+    [InlineData("reranking", false)]
+    [InlineData("embedding", true)]
+    [InlineData("retrieval", true)]
+    [InlineData("reranking", true)]
+    public async Task CancellationAndSafeErrorsAreNotWrappedAgain(string stage, bool cancelled)
+    {
+        Exception cause = cancelled
+            ? new TaskCanceledException("test cancellation")
+            : new SampleException("Safe validation error");
+        var dependency = new ThrowingDependency(stage, cause);
+        var service = new SearchService(dependency, dependency, dependency);
+        var error = await Record.ExceptionAsync(() =>
+            service.SearchAsync(new("ocean", "qflat", SearchMode.Hybrid, Rerank: true)));
+        Assert.Same(cause, error);
+    }
+
     [Fact]
     public async Task EmptyResultsDoNotInvokeReranker()
     {
@@ -159,6 +202,21 @@ public class CoreTests
         var ex = await Assert.ThrowsAsync<SampleException>(() => embeddings.EmbedAsync("ocean", default));
         Assert.Contains("AZURE_OPENAI_ENDPOINT", ex.Message);
     }
+}
+
+internal sealed class ThrowingDependency(string stage, Exception failure) :
+    IEmbeddingProvider, IQueryExecutor, IReranker
+{
+    public Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken) =>
+        stage == "embedding" ? throw failure : Task.FromResult(TestData.Vector(0));
+
+    public Task<QueryResult> ExecuteAsync(string container, QueryPlan plan, CancellationToken cancellationToken) =>
+        stage == "retrieval" ? throw failure : Task.FromResult(
+            new QueryResult([new("a", "Movie", "ocean adventure")], 1, 1));
+
+    public Task<IReadOnlyList<RerankScore>> RerankAsync(string query, IReadOnlyList<SearchRow> rows,
+        CancellationToken cancellationToken, RerankOptions? options = null) =>
+        throw failure;
 }
 
 internal sealed class FakeQuery(IReadOnlyList<SearchRow> rows) : IQueryExecutor

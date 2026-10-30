@@ -16,5 +16,7 @@ catch (Exception ex)
     Console.Error.WriteLine(ex is SampleException ? ex.Message :
         "Load failed. Check the JSON file, existing container policies, credentials and service availability.");
     Console.Error.WriteLine("Some items may have been written. No rollback or cleanup was attempted. Re-run the same stable IDs after fixing the error.");
+    Console.Error.WriteLine("Diagnostic details for the local operator (review and redact before sharing):");
+    Console.Error.WriteLine(ex);
     return 1;
 }

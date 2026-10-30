@@ -15,7 +15,7 @@ public sealed class SearchService(IQueryExecutor queries, IEmbeddingProvider emb
             var timer = Stopwatch.StartNew();
             try { vector = await embeddings.EmbedAsync(request.Query, cancellationToken); }
             catch (Exception ex) when (ex is not SampleException and not OperationCanceledException)
-            { throw new SampleException("Embedding failed. Check the OpenAI endpoint, deployment and identity permissions."); }
+            { throw new SampleException("Embedding failed. Check the OpenAI endpoint, deployment and identity permissions.", ex); }
             embeddingMs = timer.Elapsed.TotalMilliseconds;
         }
 
@@ -23,7 +23,7 @@ public sealed class SearchService(IQueryExecutor queries, IEmbeddingProvider emb
         QueryResult retrieved;
         try { retrieved = await queries.ExecuteAsync(request.Container, plan, cancellationToken); }
         catch (Exception ex) when (ex is not SampleException and not OperationCanceledException)
-        { throw new SampleException("Retrieval failed. Check Cosmos configuration, policies and data permissions."); }
+        { throw new SampleException("Retrieval failed. Check Cosmos configuration, policies and data permissions.", ex); }
 
         var rows = retrieved.Rows.Select((row, index) =>
             row with { RetrievalRank = index + 1, RetrievalIndex = index }).ToArray();
@@ -45,7 +45,7 @@ public sealed class SearchService(IQueryExecutor queries, IEmbeddingProvider emb
                     options.ReturnSentenceScores).ToArray();
             }
             catch (Exception ex) when (ex is not SampleException and not OperationCanceledException)
-            { throw new SampleException("Reranking failed. Check the inference endpoint and Semantic Reranker User permission. No fallback results were returned."); }
+            { throw new SampleException("Reranking failed. Check the inference endpoint and Semantic Reranker User permission. No fallback results were returned.", ex); }
             rerankMs = timer.Elapsed.TotalMilliseconds;
         }
         return new(rows, retrieved.RequestCharge, retrieved.RetrievalMilliseconds, embeddingMs,

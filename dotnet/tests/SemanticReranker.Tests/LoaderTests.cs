@@ -82,6 +82,20 @@ public class LoaderTests
             Assert.Throws<SampleException>(() => ContainerPolicy.Validate(doc.RootElement, "quantizedFlat"));
         }
     }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("""{"partitionKey":123}""")]
+    public void MissingOrMalformedPolicyRetainsParsingFailure(string policy)
+    {
+        using var doc = JsonDocument.Parse(policy);
+        var error = Assert.Throws<SampleException>(() =>
+            ContainerPolicy.Validate(doc.RootElement, "quantizedFlat"));
+        Assert.NotNull(error.InnerException);
+        Assert.True(error.InnerException is KeyNotFoundException or InvalidOperationException);
+        Assert.Contains(nameof(ContainerPolicy.Validate), error.InnerException.StackTrace);
+        Assert.Contains("No resources were changed", error.Message);
+    }
 }
 
 internal sealed class FakeStore : IFixtureStore
