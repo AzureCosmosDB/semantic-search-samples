@@ -5,6 +5,30 @@ with real Azure OpenAI embeddings and optional standalone semantic reranking.
 Default `azd up` restores the original **MovieLens 4,489-source-row corpus**.
 The small original-text fixture is retained only for smoke/offline tests.
 
+## Sample screenshots
+
+These screenshots show the .NET Razor app with MovieLens data, captured during
+successful live validation on October 30, 2026. The Python Streamlit app offers
+the same search and reranking controls. Results, scores and timings vary by run.
+
+### Search interface
+
+Choose an index and search mode, enter a query, and optionally enable semantic
+reranking. This example shows hybrid search for **Woody Buzz** with reranking on.
+
+![.NET sample showing search settings, the MovieLens corpus summary, and hybrid search with semantic reranking enabled.](docs/images/search-interface.png)
+
+### Reranked results and sentence scores
+
+This separate similarity-search example uses JSON targeting of the title,
+a rerank result limit of **1**, and sentence-score diagnostics. The result
+includes its original retrieval rank, vector distance, rerank score and
+expandable sentence scores.
+
+![.NET sample showing Toy Story as the single reranked result, retrieval and rerank scores, and expanded sentence-score diagnostics.](docs/images/reranked-results.png)
+
+See [advanced reranking controls](#advanced-reranking-controls) to try these options.
+
 ## Prerequisites
 
 - Git, Azure CLI, Azure Developer CLI (azd baseline 1.25.6), PowerShell 7
