@@ -2,14 +2,13 @@
 
 Run Python Streamlit and .NET Razor locally against Azure Cosmos DB for NoSQL,
 with real Azure OpenAI embeddings and optional standalone semantic reranking.
-Default `azd up` restores the original **MovieLens 4,489-source-row corpus**.
-The small original-text fixture is retained only for smoke/offline tests.
+The default deployment loads **4,489 MovieLens records** so you can explore
+vector, full-text, and hybrid search with the same dataset in both apps.
 
 ## Sample screenshots
 
-These screenshots show the .NET Razor app with MovieLens data, captured during
-successful live validation on October 30, 2026. The Python Streamlit app offers
-the same search and reranking controls. Results, scores and timings vary by run.
+The .NET Razor app is shown below. The Python Streamlit app offers the same
+search and reranking controls. Results, scores, and timings vary by query and run.
 
 ### Search interface
 
@@ -20,8 +19,8 @@ reranking. This example shows hybrid search for **Woody Buzz** with reranking on
 
 ### Reranked results and sentence scores
 
-This separate similarity-search example uses JSON targeting of the title,
-a rerank result limit of **1**, and sentence-score diagnostics. The result
+This example reranks vector-search results using the title field, a result
+limit of **1**, and sentence scores. The result
 includes its original retrieval rank, vector distance, rerank score and
 expandable sentence scores.
 
@@ -31,7 +30,7 @@ See [advanced reranking controls](#advanced-reranking-controls) to try these opt
 
 ## Prerequisites
 
-- Git, Azure CLI, Azure Developer CLI (azd baseline 1.25.6), PowerShell 7
+- Git, Azure CLI, Azure Developer CLI (tested with version 1.25.6), PowerShell 7
   on Windows/macOS/Linux, Python 3.10+ with venv/pip, and .NET 10 SDK.
   On Linux/macOS the bootstrap uses `python3`; on Windows it uses `python`.
 - Public PyPI/NuGet and Azure network access with trusted TLS.
@@ -71,9 +70,10 @@ The launcher automatically loads generated root config and stays in the foregrou
 - Streamlit: <http://127.0.0.1:8501>
 - Razor: <http://127.0.0.1:8503>
 
-Ctrl+C stops only the launcher's owned processes. Busy ports cause an error,
-not a process kill. A child exit stops its sibling and fails the launcher.
-Use `-PythonPort` and `-DotnetPort` to select other ports. Startup never seeds data.
+Press Ctrl+C to stop both apps. The launcher leaves other processes running
+and reports an error if either port is in use. Use `-PythonPort` and
+`-DotnetPort` to select other ports. If either app exits, the launcher stops
+the other app. Starting the apps does not reload data.
 
 Try **Woody Buzz**, **fishing buddies**, or **toys learning to share a child's affection**.
 For both indexes, try vector, full-text all/any, full-text ranking and hybrid,
@@ -113,66 +113,65 @@ or [.NET advanced-reranking walkthrough](dotnet/SEARCH_GUIDE.md#advanced-reranki
 
 ## What azd up does
 
-1. `preup` bootstraps dependencies and persists/reuses the account GUID.
-   It resets inference creation to `false` without authentication or Azure calls.
-   The service-free workflow then runs only native `azd provision`, not
-   package/deploy steps. Mandatory `preprovision` uses azd's resolved
-   subscription/location for the authenticated inference GET. Only HTTP 404
-   authorizes creation. No early hook guesses CLI flags or uses the CLI's
-   default subscription. Existing venv and incremental .NET outputs are reused.
-2. Bicep provisions keyless Cosmos/inference and Azure OpenAI backends with
-   scoped user roles. `postprovision` writes only private local configuration:
+1. Installs dependencies and saves generated account names for the environment.
+   Before provisioning, it checks for an existing inference account in the
+   selected subscription. It creates an account only if that lookup returns
+   HTTP 404; authentication and other lookup errors stop deployment.
+2. Provisions Azure Cosmos DB, an inference account, and Azure OpenAI with
+   keyless access and scoped user roles. The apps run locally rather than in
+   hosted application services. `postprovision` writes local configuration:
    `python/.env`, `python/.local/azd-env.ps1`, and `.local/azd-env.ps1`.
-3. `postup` downloads the pinned MovieLens file into an ignored local cache,
-   validates its raw bytes, checksum, schema and all 4,489 rows, then batches
-   real embeddings of `overview` from the deployed model. It validates every
-   vector and target policy, checks ownership across every target before writes,
-   and verifies every expected record by full readback. All search modes use
-   this same embedding deployment.
+3. Downloads and validates the MovieLens dataset, generates embeddings for each
+   movie's overview, and loads the Python and .NET containers. The loader
+   checks existing records before writing and reads back the dataset to verify
+   the load. Both apps use the same embedding deployment.
 
 `azd provision` refreshes infrastructure/config **without seeding**. Only
 `azd up` runs the seed hook automatically. Repeating `azd up` keeps account names
 and stable record IDs, reuses valid cached embeddings, and skips unchanged
-validated records. Missing owned records can be repaired. It never deletes unrelated
-documents. An occupied seed ID with foreign or changed source content fails closed.
-Provenance records model, version, deployment, dimensions and source-text hash.
-The loader retries explicit role-propagation 403 and transient 429/5xx responses within bounds.
-Fix the cause and repeat `azd up`; a partial seed is safe to resume.
+validated records. It restores missing sample records and stops if a sample ID
+is occupied by different content. Unrelated documents are not deleted.
+Embedding metadata records the model, version, deployment, dimensions, and
+source-text hash. The loader uses bounded retries for role propagation and
+transient service errors. If loading fails, resolve the reported error and
+repeat `azd up` to resume.
 
-No keys, fake-vector fallback, hosted services, manual loader commands or
-endpoint copying are required for this default path.
+The default workflow configures endpoints and loads data automatically; no
+account keys or manual loading steps are required.
 
-## MovieLens source and migration boundary
+<a id="movielens-source-and-migration-boundary"></a>
 
-The source is the original repository's [MovieLens file pinned in the user's fork](https://github.com/TheovanKraay/AzureDataRetrievalAugmentedGenerationSamples/blob/7fd162fc633617857f8b8ed2c5b2b92d4d8ef0b6/DataSet/Movies/MovieLens-4489-256D.json).
+## Dataset and data loading
+
+The sample downloads a [fixed version of the MovieLens dataset](https://github.com/TheovanKraay/AzureDataRetrievalAugmentedGenerationSamples/blob/7fd162fc633617857f8b8ed2c5b2b92d4d8ef0b6/DataSet/Movies/MovieLens-4489-256D.json).
 Raw download: **48,244,182 bytes**, SHA256
 `5f43a3b0815b80b85c647b38d3d86c320aaf0c0937a79561fe643156e62c6295`.
-No corpus is vendored. A CRLF-converted checkout is not the pinned raw file.
-The source repository retains its Microsoft MIT attribution.
+The dataset is downloaded during setup rather than included in this repository.
+When supplying a local copy, use the raw download without modifying its line
+endings. See the source repository for license and attribution details.
 
-There are 4,489 rows but 4,486 distinct original movie IDs. All rows survive:
+The dataset contains 4,489 rows and 4,486 distinct movie IDs. To preserve every row,
 `movielens-4489-v1-<one-based padded row index>-<source movie ID>` is the document
-ID, and `source_movie_id` retains the original ID. `source_metadata` preserves
+ID used by the loader, and `source_movie_id` retains the original movie ID. `source_metadata` preserves
 the source fields except the discarded 256-dimensional `vector`.
 `overview` maps to `text`; title remains `title`. Source row hashes and embedding
 deployment/model/version/dimensions/text hashes are stored separately.
 Real embeddings request 1536 dimensions. Only title/text can reach the reranker.
 
-After **all target containers** pass exact full-source readback, the hook's
-explicit `--cleanup-original-fixtures` flag removes only the exact ten unchanged
-`original-movies-v1-` fixture IDs per target, with matching data/provenance/ownership
-and conditional etags. Changed or foreign fixture records cause an explicit
-error, not deletion. No prefix deletion, unrelated cleanup or startup writes.
-The source-corpus label in the UI is not an authoritative live container count.
-Retrieval still selects at most **10 candidates**, unrelated to corpus size.
+When upgrading an environment created with the earlier ten-record sample,
+the default loading workflow removes those unchanged sample records only after
+the full MovieLens dataset has been verified in every target container.
+Modified records are not deleted; the loader reports an error instead.
+Other documents are left untouched.
+
+The dataset label in the UI describes the source dataset, not a live container
+count. Each search retrieves at most **10 candidates**, regardless of dataset size.
 
 Embeddings and per-run receipts live in `python/.local/movielens/`.
 **The first full load can take time.** It downloads the corpus, generates real
 embeddings, writes every target, and verifies the full dataset. Duration depends
-on service latency, throttling and role propagation; no fixed completion time is
-promised. Watch embedding-batch progress and each container's preflight, write
-and readback progress. Provisioning success alone does not mean the corpus is ready:
-wait for the seed hook to succeed before treating the load as complete.
+on service latency, throttling, and role propagation. Follow the loading progress
+in the terminal and wait for `azd up` to finish before starting the apps.
 
 Completed batches survive failure; rerunning skips embedding calls for validated
 cache entries and writes for unchanged records, but always repeats full readback.
@@ -194,8 +193,9 @@ To resume only the data step against already configured resources (no provisioni
 
 On non-Windows use `./python/.venv/bin/python`. `--batch-size` defaults to 32,
 bounded to 1-64. `--source-file <path>` is optional but enforces the same exact
-production bytes/hash/schema/count. Arbitrary CLI runs still require
-`--confirm-write`; cleanup is a separate explicit authorization.
+dataset bytes, checksum, schema, and row count. Manual loading requires
+`--confirm-write`. The separate `--cleanup-original-fixtures` flag permits
+removal of the unchanged records from the earlier ten-record sample.
 
 ## Configuration and advanced workflows
 
@@ -220,14 +220,17 @@ Do not mix embedding models in an existing dataset.
 
 - [Standalone Python](python/README.md)
 - [Existing-resource and manual integration workflows](README.manual.md)
-- [.NET details and browser checks](dotnet/README.md)
+- [.NET setup and tests](dotnet/README.md)
 - [Configuration switching and resource contract](infra/azd/README.md)
 
 Stop apps before switching environments. Run `azd env select <name>`,
 `azd env refresh`, `pwsh ./scripts/postprovision.ps1`, then restart the launcher.
-Never commit generated configuration. Do not run `azd down` as a test.
+Never commit generated configuration. Use `azd down` only when you intend to
+delete the deployed resources and their data.
 
-## Verification
+<a id="verification"></a>
+
+## Run tests
 
 After `azd up`, in PowerShell:
 
@@ -242,13 +245,13 @@ dotnet test dotnet/SemanticReranker.sln --no-build --filter 'FullyQualifiedName~
 Remove-Item Env:RUN_LIVE_TESTS
 ```
 
-These live suites do not inject synthetic query vectors. They cover both indexes,
-all modes and rerank toggles, plus a modest Toy Story top-three assertion for ranked
-results. Allow index propagation, then investigate failures rather than disabling
-modes. Repeat `azd up` and these checks to verify idempotency. Older synthetic
-integration suites remain available through the manual workflow, under separate IDs.
+The live tests use the deployed embedding model and cover both indexes, all search
+modes, and reranking on and off. They also check that a Toy Story query returns
+the expected movie among the top three ranked results. If you have just loaded
+data, allow time for indexing before running the tests. See the
+[manual workflow](README.manual.md) for additional integration tests.
 
-For real browser verification, keep the launcher running in one terminal. In
+For browser tests, keep the launcher running in one terminal. In
 another terminal with generated config loaded:
 
 ```powershell
@@ -263,5 +266,5 @@ This visits both already-running apps, exercises the full mode/toggle matrix,
 prints each successful case and saves screenshots only under
 `python/.local/validation/movielens/`. It neither starts nor stops apps.
 Browser tooling is optional and is not installed during `azd up`.
-Add `--matrix advanced` for an advanced-only rerun, or `--matrix baseline`
-for only the original cases. The default runs both.
+Add `--matrix advanced` to test only the advanced reranking controls, or
+`--matrix baseline` to test the standard search controls. The default runs both.
