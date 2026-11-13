@@ -47,7 +47,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2025-04-15' existing = {
   name: cosmosAccountName
 }
 
-resource inference 'Microsoft.InferenceService/inferenceAccounts@2026-08-01-preview' existing = {
+resource inference 'Microsoft.InferenceService/inferenceAccounts@2026-10-15' existing = {
   name: inferenceAccountName
 }
 

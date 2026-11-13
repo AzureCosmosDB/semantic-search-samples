@@ -36,8 +36,8 @@ not treated as absence.
 
 The template references Cosmos as `existing`. Its optional child module
 creates only `Microsoft.InferenceService/inferenceAccounts`. Availability,
-supported region and preview API access must be confirmed for your
-subscription. The sample uses API `2026-08-01-preview`; do not infer that all
+supported region and service access must be confirmed for your
+subscription. The sample uses stable API `2026-10-15`; do not infer that all
 subscriptions or regions support it.
 
 ```powershell
@@ -56,7 +56,7 @@ guess to discover the inference endpoint: read the deployed resource:
 
 ```powershell
 $inferenceId = "/subscriptions/$subscription/resourceGroups/$resourceGroup/providers/Microsoft.InferenceService/inferenceAccounts/$account"
-az resource show --ids $inferenceId --api-version 2026-08-01-preview --query properties.endpoint -o tsv
+az resource show --ids $inferenceId --api-version 2026-10-15 --query properties.endpoint -o tsv
 ```
 
 When invoking Bicep directly, leave `createInference=false` for existing

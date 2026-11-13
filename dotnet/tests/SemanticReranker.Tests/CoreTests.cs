@@ -57,7 +57,7 @@ public class CoreTests
         Assert.Equal(2, content.TopK);
         Assert.False(content.ReturnDocuments);
         Assert.Equal(SemanticRerankingDocumentType.Text, content.DocumentType);
-        var result = InferenceModelFactory.SemanticRerankingInferenceResult(
+        var result = InferenceModelFactory.SemanticRerankingResult(
             scores: [
                 InferenceModelFactory.SemanticRerankingScore(index: 1, score: 0.75f),
                 InferenceModelFactory.SemanticRerankingScore(index: 0, score: 0.25f)

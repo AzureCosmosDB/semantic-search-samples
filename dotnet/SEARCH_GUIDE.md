@@ -31,7 +31,7 @@ dotnet run --no-build --no-launch-profile `
 `azd up` normally already restores/builds. Repeat those steps after changing
 dependencies/code. Keep public NuGet sources and the committed package pins.
 Do not add a separate Azure.Identity package: credential types in this sample
-come from Azure.Core 1.63 in the `Azure.Identity` namespace.
+come from the pinned Azure.Core 1.65.0 in the `Azure.Identity` namespace.
 
 ### Equivalent commands from the dotnet directory
 
@@ -202,7 +202,7 @@ advanced options. No inference call is made.
 
 With it on, [`AzureReranker.RerankAsync`](src/SemanticReranker.Core/AzureReranker.cs)
 calls `Azure.Data.AI.InferenceClient.SemanticRerankAsync` using native
-`SemanticRerankingInferenceContent`. This is not Azure OpenAI embedding and not
+`SemanticRerankingContent`. This is not Azure OpenAI embedding and not
 a reranking method on `Microsoft.Azure.Cosmos.Container`.
 Defaults remain plain descriptions, all candidates reranked, sorted scores,
 no sentence diagnostics, and the existing configured model. No extra model/batch
@@ -231,7 +231,11 @@ Enable **Use Semantic Reranker** to use its controls:
 Description is the UI name for `text`.
 [`AzureReranker.CreateRequest`](src/SemanticReranker.Core/AzureReranker.cs) uses
 `JsonSerializer` to create new objects containing only selected fields, then
-sets `DocumentType=SemanticRerankingDocumentType.Json` and `TargetPaths`.
+sets `DocumentType=SemanticRerankingDocumentType.Json` and adds each selected
+path to the `TargetPaths` collection. The GA SDK serializes this collection as
+a comma-separated `targetPaths` string on the wire. Responses use
+`SemanticRerankingResult`, with optional service diagnostics in `Metadata`;
+document mapping still uses only each score's original `Index`.
 It never serializes a whole SearchRow or Cosmos document. Unselected fields,
 IDs, embeddings, and system properties do not go to inference. JSON targeting
 changes only reranking, not the retrieval query.

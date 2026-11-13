@@ -136,8 +136,8 @@ environment's dedicated resource group and data. Leave resources for review.
 Prerequisites: .NET 10 SDK, Azure CLI, PowerShell 7 for setup scripts, an
 existing Cosmos account and database with vector/full-text support, and an
 available companion inference account. The SDK package is explicitly pinned
-to [`Azure.Data.AI` `1.0.0-beta.1`](https://www.nuget.org/packages/Azure.Data.AI/1.0.0-beta.1).
-It is a preview dependency.
+to [`Azure.Data.AI` `1.0.0`](https://www.nuget.org/packages/Azure.Data.AI/1.0.0).
+It is the public GA dependency.
 
 ```powershell
 az login

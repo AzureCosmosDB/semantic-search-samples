@@ -7,6 +7,26 @@ namespace SemanticReranker.Tests;
 
 public sealed class AdvancedRerankingTests
 {
+    [Fact]
+    public void PublicGaMetadataDoesNotReplaceIndexBasedMapping()
+    {
+        var result = ModelReaderWriter.Read<SemanticRerankingResult>(BinaryData.FromString(
+            """{"scores":[{"index":1,"score":0.75}],"meta":{"modelName":"test-model","modelVersion":"1"}}"""))!;
+        Assert.Equal("test-model", result.Metadata.ModelName);
+        Assert.Equal("1", result.Metadata.ModelVersion);
+        var score = Assert.Single(AzureReranker.MapResponse(result));
+        Assert.Equal(1, score.Index);
+        Assert.Equal(0.75, score.Score);
+    }
+
+    [Fact]
+    public void ExistingCandidateLimitRejectsBeforeSdkCall()
+    {
+        var rows = Enumerable.Range(0, 11)
+            .Select(i => new SearchRow(i.ToString(), "Title", "Text")).ToArray();
+        Assert.Throws<SampleException>(() => AzureReranker.CreateRequest("query", rows, "model"));
+    }
+
     private static readonly SearchRow[] Rows =
     [
         new("a", "First", "duplicate text", 0.1),
@@ -33,14 +53,14 @@ public sealed class AdvancedRerankingTests
     [Fact]
     public void NativeResponseMapsOnlyRequestedSentenceDiagnostics()
     {
-        var result = ModelReaderWriter.Read<SemanticRerankingInferenceResult>(BinaryData.FromString(
+        var result = ModelReaderWriter.Read<SemanticRerankingResult>(BinaryData.FromString(
             """{"scores":[{"index":2,"score":0.9,"document":"ignored","sentenceScores":[{"index":7,"score":0.75}]}]}"""))!;
         var score = Assert.Single(AzureReranker.MapResponse(result, true));
         Assert.Equal(2, score.Index);
         Assert.Equal(7, Assert.Single(score.SentenceScores!).Index);
         Assert.Equal(0.75, score.SentenceScores![0].Score);
         Assert.Null(Assert.Single(AzureReranker.MapResponse(result)).SentenceScores);
-        var absent = ModelReaderWriter.Read<SemanticRerankingInferenceResult>(BinaryData.FromString(
+        var absent = ModelReaderWriter.Read<SemanticRerankingResult>(BinaryData.FromString(
             """{"scores":[{"index":0,"score":0.9}]}"""))!;
         var mapped = Assert.Single(AzureReranker.MapResponse(absent, true));
         Assert.True(mapped.SentenceScores is null or { Count: 0 });
@@ -54,6 +74,7 @@ public sealed class AdvancedRerankingTests
     {
         var options = new RerankOptions("json", paths, k, true);
         var content = AzureReranker.CreateRequest("query", Rows, "model", options);
+        Assert.Equal(paths.Split(','), content.TargetPaths);
         using var json = JsonDocument.Parse(ModelReaderWriter.Write(content).ToString());
         var root = json.RootElement;
         Assert.Equal("json", root.GetProperty("documentType").GetString());

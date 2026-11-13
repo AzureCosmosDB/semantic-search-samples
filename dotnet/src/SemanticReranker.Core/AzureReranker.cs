@@ -18,7 +18,7 @@ public sealed class AzureReranker : IReranker
             new InferenceClientOptions { Retry = { MaxRetries = 2, NetworkTimeout = TimeSpan.FromSeconds(60) } }));
     }
 
-    public static SemanticRerankingInferenceContent CreateRequest(
+    public static SemanticRerankingContent CreateRequest(
         string query, IReadOnlyList<SearchRow> rows, string model, RerankOptions? options = null)
     {
         options ??= new();
@@ -34,7 +34,7 @@ public sealed class AzureReranker : IReranker
             ? JsonSerializer.Serialize(paths.ToDictionary(path => path,
                 path => path == "title" ? row.Title : row.Text))
             : row.Text);
-        var content = new SemanticRerankingInferenceContent(query, documents)
+        var content = new SemanticRerankingContent(query, documents)
         {
             DocumentType = options.DocumentFormat == "json"
                 ? SemanticRerankingDocumentType.Json : SemanticRerankingDocumentType.Text,
@@ -43,13 +43,14 @@ public sealed class AzureReranker : IReranker
             Sort = true,
             Model = model
         };
-        if (options.DocumentFormat == "json") content.TargetPaths = options.TargetPaths;
+        if (options.DocumentFormat == "json")
+            foreach (var path in paths) content.TargetPaths.Add(path);
         if (options.ReturnSentenceScores) content.ReturnSentenceScore = true;
         return content;
     }
 
     public static IReadOnlyList<RerankScore> MapResponse(
-        SemanticRerankingInferenceResult result, bool returnSentenceScores = false) =>
+        SemanticRerankingResult result, bool returnSentenceScores = false) =>
         result.Scores.Select(score => new RerankScore(score.Index, score.Score,
             returnSentenceScores ? score.SentenceScores?.Select(sentence =>
                 new SentenceScore(sentence.Index, sentence.Score)).ToArray() : null)).ToArray();

@@ -2,12 +2,13 @@
 
 This is a small ASP.NET Core Razor Pages equivalent of the original
 Streamlit search workflow. It uses `Microsoft.Azure.Cosmos` for retrieval and
-the separately pinned `Azure.Data.AI` `1.0.0-beta.1` for reranking.
+the separately pinned public GA `Azure.Data.AI` `1.0.0` for reranking.
 It does not call a reranking method on the Cosmos client.
 See the [search guide](SEARCH_GUIDE.md) for manual startup, feature walkthroughs,
 and the collapsed advanced JSON targeting, result limit and sentence diagnostics.
 
-`Azure.Data.AI` requires `Azure.Core` `1.63.0`, which is also pinned directly.
+`Azure.Data.AI` `1.0.0` declares `Azure.Core` `1.65.0` as its minimum
+dependency in the public NuGet package, so Core is also pinned to `1.65.0`.
 That Core package includes the credential classes in the `Azure.Identity`
 namespace. Do not add the older standalone `Azure.Identity` `1.17.1` package:
 it defines duplicate credential types and causes compiler error CS0433.
@@ -342,9 +343,10 @@ deployment. Health alone is insufficient.
   resources or silently change throughput.
 - **Empty text results immediately after loading:** allow indexing to catch up,
   then rerun the read-only query. Never turn an empty result into a fake pass.
-- **SDK changes:** this is a pinned preview. Use the package's actual
-  `InferenceClient.SemanticRerankAsync(SemanticRerankingInferenceContent, ...)`,
-  `Scores`, nullable `Index` and nullable float `Score`; validate mapping when
+- **SDK changes:** this is the pinned public GA package. Use its actual
+  `InferenceClient.SemanticRerankAsync(SemanticRerankingContent, ...)`,
+  `SemanticRerankingResult.Scores`, `Metadata`, nullable `Index` and nullable
+  float `Score`; populate the `TargetPaths` collection for JSON requests and validate mapping when
   upgrading. No legacy Cosmos semantic-rerank APIs are used.
 - **Missing OpenAI settings on the manual path:** full-text and reranking still
   work, but vector/hybrid requests fail explicitly. The default azd path supplies

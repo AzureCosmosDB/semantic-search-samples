@@ -40,7 +40,7 @@ See [advanced reranking controls](#advanced-reranking-controls) to try these opt
   Select the same tenant/subscription. Tool installation and sign-in are not automated.
 - Permissions to create resources and assign scoped roles. Register
   `Microsoft.DocumentDB`, `Microsoft.InferenceService`, and
-  `Microsoft.CognitiveServices`. Confirm inference preview access and Cosmos quota.
+  `Microsoft.CognitiveServices`. Confirm inference availability and Cosmos quota.
 - Available Azure OpenAI quota for `text-embedding-3-small`, version `1`,
   **GlobalStandard**, capacity `30`, in **UKSouth**. Availability varies by
   subscription. This is pay-per-token capacity, not provisioned throughput.
